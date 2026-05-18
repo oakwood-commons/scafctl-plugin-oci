@@ -1,0 +1,57 @@
+# Example: Copy an image between registries.
+#
+# Prerequisites:
+#   - Auth configured for target registry:
+#     scafctl auth login github --flow pat --registry ghcr.io --write-registry-auth
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/copy-image.yaml
+#
+# Run:
+#   scafctl run solution -f examples/copy-image.yaml \
+#     -r target=ghcr.io/myorg/alpine:latest
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-copy-example
+  version: 1.0.0
+  description: Copy a container image between registries.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    source:
+      type: string
+      description: Source image reference to copy from
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: docker.io/library/alpine:latest
+
+    target:
+      type: string
+      description: Target image reference (must have push access)
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: "REPLACE_ME"
+
+  workflow:
+    actions:
+      copy-image:
+        description: Copies the source image to the target registry
+        provider: oci
+        inputs:
+          operation: copy
+          src:
+            rslvr: source
+          dst:
+            rslvr: target

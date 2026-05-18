@@ -1,0 +1,35 @@
+# Example: Get the digest of a public image (no auth required).
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/digest.yaml
+#
+# Run resolvers (shows OCI metadata):
+#   scafctl run resolver -f examples/digest.yaml
+#
+# Run full solution:
+#   scafctl run solution -f examples/digest.yaml
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-digest-example
+  version: 1.0.0
+  description: Fetch digest and metadata for a public container image.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    imageInfo:
+      type: any
+      description: Fetches digest, size, and media type for alpine:latest
+      resolve:
+        with:
+          - provider: oci
+            inputs:
+              operation: digest
+              ref: docker.io/library/alpine:latest
