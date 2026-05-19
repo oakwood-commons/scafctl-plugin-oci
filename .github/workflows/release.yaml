@@ -127,8 +127,7 @@ jobs:
             --platform "linux/arm64=dist/${BINARY}-linux-arm64" \
             --platform "darwin/amd64=dist/${BINARY}-darwin-amd64" \
             --platform "darwin/arm64=dist/${BINARY}-darwin-arm64" \
-            --platform "windows/amd64=dist/${BINARY}-windows-amd64.exe" \
-            --platform "windows/arm64=dist/${BINARY}-windows-arm64.exe"
+            --platform "windows/amd64=dist/${BINARY}-windows-amd64.exe"
 
           scafctl catalog push \
             "oci@${VERSION}" \
