@@ -136,7 +136,7 @@ jobs:
             --force
 
           # Resolve the pushed manifest digest for cosign signing
-          IMAGE="ghcr.io/${{ github.repository_owner }}/providers/oci"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/scafctl-catalog/providers/oci"
           DIGEST=$(crane digest "${IMAGE}:${VERSION}")
           echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
