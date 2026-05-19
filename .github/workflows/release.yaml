@@ -131,12 +131,12 @@ jobs:
 
           scafctl catalog push \
             "oci@${VERSION}" \
-            --catalog "oci://ghcr.io/${{ github.repository_owner }}/scafctl-catalog" \
+            --catalog "oci://ghcr.io/${{ github.repository_owner }}" \
             --kind "provider" \
             --force
 
           # Resolve the pushed manifest digest for cosign signing
-          IMAGE="ghcr.io/${{ github.repository_owner }}/scafctl-catalog/providers/oci"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/providers/oci"
           DIGEST=$(crane digest "${IMAGE}:${VERSION}")
           echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
@@ -146,7 +146,7 @@ jobs:
           AUTH=$(printf '%s' "${{ github.actor }}:${{ secrets.CATALOG_PUSH_TOKEN }}" | base64 -w 0)
           printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > ~/.docker/config.json
           scafctl catalog index push \
-            --catalog "oci://ghcr.io/${{ github.repository_owner }}/scafctl-catalog"
+            --catalog "oci://ghcr.io/${{ github.repository_owner }}"
 
   sign:
     name: Sign OCI Artifact
