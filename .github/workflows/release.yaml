@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  test:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race ./...
+
+  release:
+    name: Release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-catalog:
+    name: Publish Catalog Artifact
+    needs: release
+    runs-on: ubuntu-latest
+    outputs:
+      image_ref: ${{ steps.push.outputs.image_ref }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Install scafctl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TMP_DIR="$(mktemp -d)"
+          gh release download --repo oakwood-commons/scafctl \
+            --pattern 'scafctl_*_Linux_x86_64.tar.gz' \
+            --dir "${TMP_DIR}"
+          tar xzf "${TMP_DIR}"/scafctl_*_Linux_x86_64.tar.gz -C "${TMP_DIR}"
+          sudo mv "${TMP_DIR}/scafctl" /usr/local/bin/scafctl
+          rm -rf "${TMP_DIR}"
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987 # v0.5
+
+      - name: Login to GitHub Container Registry
+        run: |
+          mkdir -p ~/.docker
+          AUTH=$(printf '%s' "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" | base64 -w 0)
+          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > ~/.docker/config.json
+
+      - name: Download release archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          mkdir -p dist
+          gh release download "${TAG}" --repo "${{ github.repository }}" --dir dist
+
+      - name: Extract binaries from archives
+        run: |
+          BINARY="scafctl-plugin-oci"
+          cd dist
+
+          for platform in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64; do
+            archive="${BINARY}_${platform}.tar.gz"
+            if [ -f "${archive}" ]; then
+              mkdir -p "tmp_${platform}"
+              tar xzf "${archive}" -C "tmp_${platform}"
+              mv "tmp_${platform}/${BINARY}" "${BINARY}-${platform//_/-}"
+              rm -rf "tmp_${platform}"
+            fi
+          done
+
+          archive="${BINARY}_windows_amd64.zip"
+          if [ -f "${archive}" ]; then
+            mkdir -p tmp_windows_amd64
+            unzip -o "${archive}" -d tmp_windows_amd64
+            mv "tmp_windows_amd64/${BINARY}.exe" "${BINARY}-windows-amd64.exe"
+            rm -rf tmp_windows_amd64
+          fi
+
+          archive="${BINARY}_windows_arm64.zip"
+          if [ -f "${archive}" ]; then
+            mkdir -p tmp_windows_arm64
+            unzip -o "${archive}" -d tmp_windows_arm64
+            mv "tmp_windows_arm64/${BINARY}.exe" "${BINARY}-windows-arm64.exe"
+            rm -rf tmp_windows_arm64
+          fi
+
+      - name: Build and push catalog artifact
+        id: push
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          BINARY="scafctl-plugin-oci"
+
+          scafctl build plugin \
+            --force \
+            --name "oci" \
+            --kind "provider" \
+            --version "${VERSION}" \
+            --platform "linux/amd64=dist/${BINARY}-linux-amd64" \
+            --platform "linux/arm64=dist/${BINARY}-linux-arm64" \
+            --platform "darwin/amd64=dist/${BINARY}-darwin-amd64" \
+            --platform "darwin/arm64=dist/${BINARY}-darwin-arm64" \
+            --platform "windows/amd64=dist/${BINARY}-windows-amd64.exe" \
+            --platform "windows/arm64=dist/${BINARY}-windows-arm64.exe"
+
+          scafctl catalog push \
+            "oci@${VERSION}" \
+            --catalog "oci://ghcr.io/${{ github.repository_owner }}/scafctl-catalog" \
+            --kind "provider" \
+            --force
+
+          # Resolve the pushed manifest digest for cosign signing
+          IMAGE="ghcr.io/${{ github.repository_owner }}/providers/oci"
+          DIGEST=$(crane digest "${IMAGE}:${VERSION}")
+          echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Refresh catalog index
+        run: |
+          mkdir -p ~/.docker
+          AUTH=$(printf '%s' "${{ github.actor }}:${{ secrets.CATALOG_PUSH_TOKEN }}" | base64 -w 0)
+          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > ~/.docker/config.json
+          scafctl catalog index push \
+            --catalog "oci://ghcr.io/${{ github.repository_owner }}/scafctl-catalog"
+
+  sign:
+    name: Sign OCI Artifact
+    needs: publish-catalog
+    if: needs.publish-catalog.outputs.image_ref != ''
+    permissions:
+      id-token: write
+      packages: write
+    uses: oakwood-commons/scafctl/.github/workflows/sign-plugin.yml@sign-plugin/v1
+    with:
+      image-ref: ${{ needs.publish-catalog.outputs.image_ref }}

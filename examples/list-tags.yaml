@@ -1,0 +1,32 @@
+# Example: List tags in a public repository (no auth required).
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/list-tags.yaml
+#
+# Run:
+#   scafctl run resolver -f examples/list-tags.yaml
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-list-tags-example
+  version: 1.0.0
+  description: List available tags for a public container image repository.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    tags:
+      type: any
+      description: Lists available tags for the alpine repository
+      resolve:
+        with:
+          - provider: oci
+            inputs:
+              operation: ls
+              repository: docker.io/library/alpine

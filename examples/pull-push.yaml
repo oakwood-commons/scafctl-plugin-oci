@@ -1,0 +1,76 @@
+# Example: Pull an image to tarball, then push it to another registry.
+#
+# Prerequisites:
+#   - Auth configured for target registry
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/pull-push.yaml
+#
+# Run:
+#   scafctl run solution -f examples/pull-push.yaml \
+#     -r target=ghcr.io/myorg/alpine:latest
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-pull-push-example
+  version: 1.0.0
+  description: Pull an image to a tarball and push it to another registry.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    source:
+      type: string
+      description: Source image to pull
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: docker.io/library/alpine:latest
+
+    target:
+      type: string
+      description: Target image reference to push to
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: "REPLACE_ME"
+
+    outputDir:
+      type: string
+      description: Directory to save the tarball
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: /tmp
+
+  workflow:
+    actions:
+      pull-image:
+        description: Pulls the source image to a local tarball
+        provider: oci
+        inputs:
+          operation: pull
+          ref:
+            rslvr: source
+          path:
+            expr: "_.outputDir + '/image.tar'"
+
+      push-image:
+        description: Pushes the pulled tarball to the target registry
+        dependsOn: [pull-image]
+        provider: oci
+        inputs:
+          operation: push
+          ref:
+            rslvr: target
+          path:
+            expr: "__actions['pull-image'].results.path"

@@ -1,0 +1,170 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Benchmark Comparison
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      BENCH_COUNT: 6
+      BENCH_TIME: 1s
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Find changed benchmark packages
+        id: find-bench
+        run: |
+          CHANGED_PKGS=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD -- '*.go' \
+            | xargs -I{} dirname {} \
+            | sort -u \
+            | sed 's|^\./|./|; s|^|./|; s|^\./\./|./|' \
+            || true)
+
+          if [ -z "$CHANGED_PKGS" ]; then
+            echo "No Go packages changed, skipping."
+            echo "packages=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BENCH_PKGS=""
+          for pkg in $CHANGED_PKGS; do
+            if grep -rl --include='*_test.go' 'func Benchmark' "$pkg" >/dev/null 2>&1; then
+              BENCH_PKGS="$BENCH_PKGS $pkg"
+            fi
+          done
+          BENCH_PKGS=$(echo "$BENCH_PKGS" | xargs)
+
+          if [ -z "$BENCH_PKGS" ]; then
+            echo "Changed packages have no benchmarks, skipping."
+            echo "packages=" >> "$GITHUB_OUTPUT"
+          else
+            echo "packages=$BENCH_PKGS" >> "$GITHUB_OUTPUT"
+            echo "Found changed benchmark packages: $BENCH_PKGS"
+          fi
+
+      - name: Run benchmarks on PR branch
+        if: steps.find-bench.outputs.packages != ''
+        run: |
+          go test -run='^$' -bench='.' -benchmem \
+            -benchtime="${BENCH_TIME}" -count="${BENCH_COUNT}" \
+            -timeout=20m \
+            -short \
+            ${{ steps.find-bench.outputs.packages }} | tee pr-bench.txt
+
+      - name: Checkout base branch
+        if: steps.find-bench.outputs.packages != ''
+        run: git checkout "${{ github.event.pull_request.base.sha }}"
+
+      - name: Run benchmarks on base branch
+        if: steps.find-bench.outputs.packages != ''
+        run: |
+          go test -run='^$' -bench='.' -benchmem \
+            -benchtime="${BENCH_TIME}" -count="${BENCH_COUNT}" \
+            -timeout=20m \
+            -short \
+            ${{ steps.find-bench.outputs.packages }} | tee base-bench.txt
+
+      - name: Compare benchmarks
+        if: steps.find-bench.outputs.packages != ''
+        id: benchstat
+        run: |
+          set +e
+          RESULT=$(benchstat base-bench.txt pr-bench.txt 2>&1)
+          EMPTY=false
+          if [ -z "$RESULT" ] || echo "$RESULT" | grep -q 'no data'; then
+            EMPTY=true
+          fi
+          echo "empty=$EMPTY" >> "$GITHUB_OUTPUT"
+          echo "$RESULT" > benchstat-result.txt
+          set -e
+
+      - name: Post benchmark comparison
+        if: steps.find-bench.outputs.packages != '' && steps.benchstat.outputs.empty != 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- benchmark-comparison -->';
+            let result = 'No results available';
+            try {
+              result = fs.readFileSync('benchstat-result.txt', 'utf8').trim();
+            } catch (e) {
+              console.log('Could not read benchstat-result.txt:', e.message);
+            }
+            const count = process.env.BENCH_COUNT || '6';
+            const benchTime = process.env.BENCH_TIME || '1s';
+            const body = [
+              marker,
+              '## Benchmark Comparison',
+              '',
+              '<details>',
+              '<summary>Click to expand benchmark results</summary>',
+              '',
+              '```',
+              result,
+              '```',
+              '',
+              '</details>',
+              '',
+              '> **How to read**: `~` means no significant change, `+` means regression, `-` means improvement. `p`-value >= 0.05 means the difference is not statistically significant.',
+              '>',
+              `> Benchmarks ran with \`-count=${count}\` and \`-benchtime=${benchTime}\`.`,
+            ].join('\n');
+
+            const prNumber = context.payload.pull_request?.number;
+            if (!prNumber) {
+              console.log('No PR number found, skipping comment.');
+              return;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

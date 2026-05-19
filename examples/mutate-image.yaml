@@ -1,0 +1,49 @@
+# Example: Mutate image labels and configuration.
+#
+# Prerequisites:
+#   - Auth configured for the target registry
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/mutate-image.yaml
+#
+# Run:
+#   scafctl run solution -f examples/mutate-image.yaml \
+#     -r ref=ghcr.io/myorg/myimage:latest
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-mutate-example
+  version: 1.0.0
+  description: Mutate container image metadata (labels, env, entrypoint).
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    ref:
+      type: string
+      description: Image reference to mutate (must have push access)
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: "REPLACE_ME"
+
+  workflow:
+    actions:
+      mutate-labels:
+        description: Adds labels to the target image
+        provider: oci
+        inputs:
+          operation: mutate
+          ref:
+            rslvr: ref
+          config:
+            labels:
+              maintainer: "platform-team"
+              version: "1.0.0"
