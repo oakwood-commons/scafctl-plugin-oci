@@ -7,15 +7,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/jsonschema-go/jsonschema"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
 	sdkprovider "github.com/oakwood-commons/scafctl-plugin-sdk/provider"
@@ -41,6 +44,7 @@ const (
 	OpCopy     = "copy"
 	OpAppend   = "append"
 	OpMutate   = "mutate"
+	OpIndex    = "index"
 	OpDelete   = "delete"
 )
 
@@ -127,6 +131,8 @@ func (p *Plugin) ExecuteProvider(ctx context.Context, providerName string, input
 		return p.executeAppend(ctx, input)
 	case OpMutate:
 		return p.executeMutate(ctx, input)
+	case OpIndex:
+		return p.executeIndex(ctx, input)
 	case OpDelete:
 		return p.executeDelete(ctx, input)
 	default:
@@ -170,9 +176,24 @@ func (p *Plugin) DescribeWhatIf(_ context.Context, providerName string, input ma
 	case OpCopy:
 		return fmt.Sprintf("Would copy %s to %s", src, dst), nil
 	case OpAppend:
-		return fmt.Sprintf("Would append layer(s) to %s", ref), nil
+		msg := fmt.Sprintf("Would append layer(s) to %s", ref)
+		if dst != "" && dst != ref {
+			msg = fmt.Sprintf("Would append layer(s) to %s → %s", ref, dst)
+		}
+		return msg, nil
 	case OpMutate:
-		return fmt.Sprintf("Would mutate config of %s", ref), nil
+		parts := []string{"Would mutate"}
+		if n := countLayers(input); n > 0 {
+			parts = append(parts, fmt.Sprintf("(append %d layer(s))", n))
+		}
+		parts = append(parts, ref)
+		if dst != "" && dst != ref {
+			parts = append(parts, "→", dst)
+		}
+		return strings.Join(parts, " "), nil
+	case OpIndex:
+		n := countManifests(input)
+		return fmt.Sprintf("Would create multi-arch index %s with %d manifest(s)", ref, n), nil
 	case OpDelete:
 		return fmt.Sprintf("Would delete %s from registry", ref), nil
 	default:
@@ -227,6 +248,73 @@ func platformOption(input map[string]any) ([]remote.Option, error) {
 		return nil, err
 	}
 	return []remote.Option{remote.WithPlatform(*plat)}, nil
+}
+
+// isScratch returns true if the ref indicates a scratch (empty) base image.
+func isScratch(ref string) bool {
+	return ref == "scratch"
+}
+
+// newScratchImage returns a new empty OCI image.
+func newScratchImage() (v1.Image, error) {
+	return mutate.MediaType(empty.Image, types.OCIManifestSchema1), nil
+}
+
+// resolveBaseImage returns the base image for append/mutate operations.
+// If ref is "scratch", returns an empty image. Otherwise fetches from the registry.
+func (p *Plugin) resolveBaseImage(ctx context.Context, input map[string]any, ref string) (v1.Image, error) {
+	if isScratch(ref) {
+		return newScratchImage()
+	}
+
+	imgRef, err := name.ParseReference(ref)
+	if err != nil {
+		return nil, fmt.Errorf("parsing reference %q: %w", ref, err)
+	}
+
+	platOpts, err := platformOption(input)
+	if err != nil {
+		return nil, err
+	}
+
+	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
+	if err != nil {
+		return nil, fmt.Errorf("fetching image %q: %w", ref, err)
+	}
+
+	img, err := desc.Image()
+	if err != nil {
+		return nil, fmt.Errorf("resolving image %q: %w", ref, err)
+	}
+
+	return img, nil
+}
+
+// resolveDestination determines the destination reference for push operations.
+// When ref is "scratch", a dst input is required. Otherwise dst defaults to ref.
+func resolveDestination(ref string, input map[string]any) (string, name.Reference, error) {
+	dstStr := ref
+	if rawDst, hasDst := input["dst"]; hasDst {
+		dst, ok := rawDst.(string)
+		if !ok {
+			return "", nil, fmt.Errorf("field \"dst\": expected string, got %T", rawDst)
+		}
+		if dst == "" {
+			return "", nil, fmt.Errorf("field \"dst\": must be non-empty")
+		}
+		dstStr = dst
+	}
+
+	if isScratch(ref) && dstStr == ref {
+		return "", nil, fmt.Errorf("\"dst\" is required when ref is \"scratch\"")
+	}
+
+	dstRef, err := name.ParseReference(dstStr)
+	if err != nil {
+		return "", nil, fmt.Errorf("parsing destination reference %q: %w", dstStr, err)
+	}
+
+	return dstStr, dstRef, nil
 }
 
 // requireString extracts a required string field from input or returns an error.
@@ -509,24 +597,14 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("at least one layer path is required")
 	}
 
-	imgRef, err := name.ParseReference(ref)
-	if err != nil {
-		return nil, fmt.Errorf("parsing reference %q: %w", ref, err)
-	}
-
-	platOpts, err := platformOption(input)
+	dstStr, dstRef, err := resolveDestination(ref, input)
 	if err != nil {
 		return nil, err
 	}
 
-	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
+	img, err := p.resolveBaseImage(ctx, input, ref)
 	if err != nil {
-		return nil, fmt.Errorf("fetching base image %q: %w", ref, err)
-	}
-
-	img, err := desc.Image()
-	if err != nil {
-		return nil, fmt.Errorf("resolving base image %q: %w", ref, err)
+		return nil, err
 	}
 
 	var layers []v1.Layer
@@ -543,8 +621,8 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("appending layers: %w", err)
 	}
 
-	if err := remote.Write(imgRef, newImg, p.remoteOptions(ctx)...); err != nil {
-		return nil, fmt.Errorf("pushing appended image to %q: %w", ref, err)
+	if err := remote.Write(dstRef, newImg, p.remoteOptions(ctx)...); err != nil {
+		return nil, fmt.Errorf("pushing appended image to %q: %w", dstStr, err)
 	}
 
 	newDigest, err := newImg.Digest()
@@ -560,61 +638,81 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 	return &sdkprovider.Output{
 		Data: map[string]any{
 			"success": true,
-			"ref":     ref,
+			"ref":     dstStr,
 			"digest":  newDigest.String(),
 			"size":    newSize,
 		},
 	}, nil
 }
 
-// executeMutate modifies image config fields.
+// executeMutate modifies image config fields, optionally appending layers and
+// writing to a destination reference.
 func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkprovider.Output, error) {
 	ref, err := requireString(input, "ref")
 	if err != nil {
 		return nil, err
 	}
 
-	imgRef, err := name.ParseReference(ref)
-	if err != nil {
-		return nil, fmt.Errorf("parsing reference %q: %w", ref, err)
-	}
-
-	platOpts, err := platformOption(input)
+	img, err := p.resolveBaseImage(ctx, input, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
+	// Append layers if provided.
+	var layerPaths []string
+	if _, hasLayers := input["layers"]; hasLayers {
+		var layersErr error
+		layerPaths, layersErr = getStringSlice(input, "layers")
+		if layersErr != nil {
+			return nil, layersErr
+		}
+	}
+	if len(layerPaths) > 0 {
+		var layers []v1.Layer
+		for _, lp := range layerPaths {
+			layer, layerErr := layerFromPath(lp)
+			if layerErr != nil {
+				return nil, fmt.Errorf("creating layer from %q: %w", lp, layerErr)
+			}
+			layers = append(layers, layer)
+		}
+		img, err = mutate.AppendLayers(img, layers...)
+		if err != nil {
+			return nil, fmt.Errorf("appending layers: %w", err)
+		}
+	}
+
+	// Build config from convenience inputs merged with nested config map.
+	cfg := mergeConvenienceConfig(input)
+
+	if len(cfg) == 0 && len(layerPaths) == 0 {
+		return nil, fmt.Errorf("mutate requires at least one of: config fields, convenience inputs (entrypoint, cmd, user, workdir, env, labels), or layers")
+	}
+
+	if len(cfg) > 0 {
+		cfgFile, cfgErr := img.ConfigFile()
+		if cfgErr != nil {
+			return nil, fmt.Errorf("reading image config: %w", cfgErr)
+		}
+
+		if cfgErr := applyConfigMutations(cfgFile, cfg); cfgErr != nil {
+			return nil, fmt.Errorf("invalid config mutation: %w", cfgErr)
+		}
+
+		img, err = mutate.ConfigFile(img, cfgFile)
+		if err != nil {
+			return nil, fmt.Errorf("applying config mutations: %w", err)
+		}
+	}
+
+	// Determine destination: dst overrides ref.
+	dstStr, dstRef, err := resolveDestination(ref, input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching image %q: %w", ref, err)
+		return nil, err
 	}
 
-	img, err := desc.Image()
-	if err != nil {
-		return nil, fmt.Errorf("resolving image %q: %w", ref, err)
-	}
-
-	cfg, _ := input["config"].(map[string]any)
-	if cfg == nil {
-		return nil, fmt.Errorf("required field \"config\" is missing")
-	}
-
-	cfgFile, err := img.ConfigFile()
-	if err != nil {
-		return nil, fmt.Errorf("reading image config: %w", err)
-	}
-
-	if err := applyConfigMutations(cfgFile, cfg); err != nil {
-		return nil, fmt.Errorf("invalid config mutation: %w", err)
-	}
-
-	img, err = mutate.ConfigFile(img, cfgFile)
-	if err != nil {
-		return nil, fmt.Errorf("applying config mutations: %w", err)
-	}
-
-	if err := remote.Write(imgRef, img, p.remoteOptions(ctx)...); err != nil {
-		return nil, fmt.Errorf("pushing mutated image to %q: %w", ref, err)
+	if err := remote.Write(dstRef, img, p.remoteOptions(ctx)...); err != nil {
+		return nil, fmt.Errorf("pushing mutated image to %q: %w", dstStr, err)
 	}
 
 	newDigest, err := img.Digest()
@@ -622,11 +720,17 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("getting new digest: %w", err)
 	}
 
+	newSize, err := img.Size()
+	if err != nil {
+		return nil, fmt.Errorf("getting new size: %w", err)
+	}
+
 	return &sdkprovider.Output{
 		Data: map[string]any{
 			"success": true,
-			"ref":     ref,
+			"ref":     dstStr,
 			"digest":  newDigest.String(),
+			"size":    newSize,
 		},
 	}, nil
 }
@@ -653,6 +757,161 @@ func (p *Plugin) executeDelete(ctx context.Context, input map[string]any) (*sdkp
 			"ref":     ref,
 		},
 	}, nil
+}
+
+// executeIndex creates a multi-arch OCI image index from a list of per-platform manifests.
+func (p *Plugin) executeIndex(ctx context.Context, input map[string]any) (*sdkprovider.Output, error) {
+	ref, err := requireString(input, "ref")
+	if err != nil {
+		return nil, err
+	}
+
+	idxRef, err := name.ParseReference(ref)
+	if err != nil {
+		return nil, fmt.Errorf("parsing reference %q: %w", ref, err)
+	}
+
+	manifests, err := getManifestEntries(input)
+	if err != nil {
+		return nil, err
+	}
+
+	idx := v1.ImageIndex(empty.Index)
+
+	for _, entry := range manifests {
+		entryRef, err := name.ParseReference(entry.ref)
+		if err != nil {
+			return nil, fmt.Errorf("parsing manifest reference %q: %w", entry.ref, err)
+		}
+
+		desc, err := remote.Get(entryRef, p.remoteOptions(ctx)...)
+		if err != nil {
+			return nil, fmt.Errorf("fetching manifest %q: %w", entry.ref, err)
+		}
+
+		img, err := desc.Image()
+		if err != nil {
+			return nil, fmt.Errorf("resolving image %q: %w", entry.ref, err)
+		}
+
+		platform, err := resolveEntryPlatform(entry, img)
+		if err != nil {
+			return nil, err
+		}
+
+		add := mutate.IndexAddendum{
+			Add: img,
+			Descriptor: v1.Descriptor{
+				Platform: platform,
+			},
+		}
+
+		idx = mutate.AppendManifests(idx, add)
+	}
+
+	if err := remote.WriteIndex(idxRef, idx, p.remoteOptions(ctx)...); err != nil {
+		return nil, fmt.Errorf("pushing index to %q: %w", ref, err)
+	}
+
+	digest, err := idx.Digest()
+	if err != nil {
+		return nil, fmt.Errorf("getting index digest: %w", err)
+	}
+
+	mediaType, err := idx.MediaType()
+	if err != nil {
+		return nil, fmt.Errorf("getting index media type: %w", err)
+	}
+
+	return &sdkprovider.Output{
+		Data: map[string]any{
+			"success":   true,
+			"ref":       ref,
+			"digest":    digest.String(),
+			"mediaType": string(mediaType),
+		},
+	}, nil
+}
+
+// manifestEntry represents one image in an index.
+type manifestEntry struct {
+	ref      string
+	platform string
+}
+
+// getManifestEntries extracts and validates the manifests array from input.
+func getManifestEntries(input map[string]any) ([]manifestEntry, error) {
+	raw, ok := input["manifests"]
+	if !ok {
+		return nil, fmt.Errorf("required field \"manifests\" is missing")
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("field \"manifests\": expected array, got %T", raw)
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("field \"manifests\": at least one manifest entry is required")
+	}
+
+	entries := make([]manifestEntry, 0, len(items))
+	for i, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("manifests[%d]: expected object, got %T", i, item)
+		}
+
+		ref, _ := m["ref"].(string)
+		if ref == "" {
+			return nil, fmt.Errorf("manifests[%d]: required field \"ref\" is missing or empty", i)
+		}
+
+		platform, _ := m["platform"].(string)
+		entries = append(entries, manifestEntry{ref: ref, platform: platform})
+	}
+
+	return entries, nil
+}
+
+// resolveEntryPlatform determines the platform for an index entry. If an explicit
+// platform string is provided, it is parsed and used. Otherwise, the platform is
+// read from the image's config file.
+func resolveEntryPlatform(entry manifestEntry, img v1.Image) (*v1.Platform, error) {
+	if entry.platform != "" {
+		p, err := parsePlatform(entry.platform)
+		if err != nil {
+			return nil, fmt.Errorf("manifest %q: %w", entry.ref, err)
+		}
+		return p, nil
+	}
+
+	cfgFile, err := img.ConfigFile()
+	if err != nil {
+		return nil, fmt.Errorf("manifest %q: reading config to detect platform: %w", entry.ref, err)
+	}
+
+	if cfgFile.OS == "" || cfgFile.Architecture == "" {
+		return nil, fmt.Errorf("manifest %q: platform not specified and image config lacks os/architecture", entry.ref)
+	}
+
+	return &v1.Platform{
+		OS:           cfgFile.OS,
+		Architecture: cfgFile.Architecture,
+		Variant:      cfgFile.Variant,
+	}, nil
+}
+
+// countManifests returns the number of manifest entries in the input.
+func countManifests(input map[string]any) int {
+	raw, ok := input["manifests"]
+	if !ok {
+		return 0
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return 0
+	}
+	return len(items)
 }
 
 // getStringSlice extracts a []string from input, handling []any from JSON deserialization.
@@ -708,26 +967,54 @@ func layerFromPath(path string) (v1.Layer, error) {
 	return tarball.LayerFromFile(absPath)
 }
 
+// mergeConvenienceConfig builds a config map from top-level convenience inputs
+// merged with the nested "config" map. Convenience inputs take precedence.
+func mergeConvenienceConfig(input map[string]any) map[string]any {
+	cfg, _ := input["config"].(map[string]any)
+
+	// Collect convenience inputs.
+	convenience := map[string]any{}
+	for _, key := range []string{"entrypoint", "cmd", "user", "workdir", "env", "labels"} {
+		if v, exists := input[key]; exists {
+			convenience[key] = v
+		}
+	}
+
+	if cfg == nil && len(convenience) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]any)
+	for k, v := range cfg {
+		merged[k] = v
+	}
+	// Convenience inputs override config fields.
+	for k, v := range convenience {
+		merged[k] = v
+	}
+	return merged
+}
+
 // applyConfigMutations applies config map values to a config file.
 func applyConfigMutations(cfgFile *v1.ConfigFile, cfg map[string]any) error {
 	if v, exists := cfg["env"]; exists {
-		env, ok := getStringSliceFromAny(v)
-		if !ok {
-			return fmt.Errorf("field \"env\": expected array of strings")
+		env, err := coerceEnv(v)
+		if err != nil {
+			return fmt.Errorf("field \"env\": %w", err)
 		}
 		cfgFile.Config.Env = env
 	}
 	if v, exists := cfg["entrypoint"]; exists {
-		entrypoint, ok := getStringSliceFromAny(v)
+		entrypoint, ok := coerceStringOrSlice(v)
 		if !ok {
-			return fmt.Errorf("field \"entrypoint\": expected array of strings")
+			return fmt.Errorf("field \"entrypoint\": expected string or array of strings")
 		}
 		cfgFile.Config.Entrypoint = entrypoint
 	}
 	if v, exists := cfg["cmd"]; exists {
-		cmd, ok := getStringSliceFromAny(v)
+		cmd, ok := coerceStringOrSlice(v)
 		if !ok {
-			return fmt.Errorf("field \"cmd\": expected array of strings")
+			return fmt.Errorf("field \"cmd\": expected string or array of strings")
 		}
 		cfgFile.Config.Cmd = cmd
 	}
@@ -771,6 +1058,75 @@ func getStringSliceFromAny(v any) ([]string, bool) {
 	}
 }
 
+// coerceStringOrSlice normalizes a value to []string, accepting a single string
+// or an array of strings.
+func coerceStringOrSlice(v any) ([]string, bool) {
+	if s, ok := v.(string); ok {
+		return []string{s}, true
+	}
+	return getStringSliceFromAny(v)
+}
+
+// coerceEnv normalizes env values to []string{"KEY=VALUE", ...}.
+// Accepts []string, []any (of strings), or map[string]any.
+func coerceEnv(v any) ([]string, error) {
+	if m, ok := v.(map[string]any); ok {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		result := make([]string, 0, len(m))
+		for _, k := range keys {
+			result = append(result, fmt.Sprintf("%s=%v", k, m[k]))
+		}
+		return result, nil
+	}
+	env, ok := getStringSliceFromAny(v)
+	if !ok {
+		return nil, fmt.Errorf("expected array of strings or map of key-value pairs")
+	}
+	return env, nil
+}
+
+// countLayers returns the number of layers in the input, handling both []any and []string.
+func countLayers(input map[string]any) int {
+	raw, ok := input["layers"]
+	if !ok {
+		return 0
+	}
+	switch v := raw.(type) {
+	case []any:
+		return len(v)
+	case []string:
+		return len(v)
+	default:
+		return 0
+	}
+}
+
+// stringOrArraySchema returns a JSON Schema that accepts either a string or an array of strings.
+func stringOrArraySchema(description string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: description,
+		OneOf: []*jsonschema.Schema{
+			sdkhelper.StringProp("single value"),
+			sdkhelper.ArrayProp("list of values", sdkhelper.WithItems(sdkhelper.StringProp("element"))),
+		},
+	}
+}
+
+// stringArrayOrMapSchema returns a JSON Schema that accepts either an array of strings or an object map.
+func stringArrayOrMapSchema(description string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: description,
+		OneOf: []*jsonschema.Schema{
+			sdkhelper.ArrayProp("array of VAR=value strings", sdkhelper.WithItems(sdkhelper.StringProp("VAR=value"))),
+			sdkhelper.ObjectProp("map of key-value pairs", nil, nil),
+		},
+	}
+}
+
 func buildInputSchema() *jsonschema.Schema {
 	return sdkhelper.ObjectSchema(
 		[]string{"operation"},
@@ -779,11 +1135,11 @@ func buildInputSchema() *jsonschema.Schema {
 				"The operation to perform",
 				sdkhelper.WithEnum(
 					OpDigest, OpManifest, OpLs, OpCatalog,
-					OpPull, OpPush, OpCopy, OpAppend, OpMutate, OpDelete,
+					OpPull, OpPush, OpCopy, OpAppend, OpMutate, OpIndex, OpDelete,
 				),
 			),
 			"ref": sdkhelper.StringProp(
-				"Image reference (e.g., ghcr.io/org/repo:tag or ghcr.io/org/repo@sha256:...)",
+				"Image reference (e.g., ghcr.io/org/repo:tag). Use \"scratch\" for an empty base image in append/mutate operations",
 				sdkhelper.WithExample("ghcr.io/myorg/myapp:latest"),
 			),
 			"src": sdkhelper.StringProp(
@@ -791,7 +1147,7 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("ghcr.io/myorg/myapp:v1"),
 			),
 			"dst": sdkhelper.StringProp(
-				"Destination image reference for copy operations",
+				"Destination image reference for copy and mutate operations",
 				sdkhelper.WithExample("ecr.io/myorg/myapp:v1"),
 			),
 			"repository": sdkhelper.StringProp(
@@ -811,11 +1167,22 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("linux/amd64"),
 			),
 			"layers": sdkhelper.ArrayProp(
-				"Layer paths to append (files or directories)",
+				"Layer paths to append (files or directories); supported in append and mutate operations",
 				sdkhelper.WithItems(sdkhelper.StringProp("Layer file path")),
 			),
+			"manifests": sdkhelper.ArrayProp(
+				"List of per-platform images for the index operation",
+				sdkhelper.WithItems(sdkhelper.ObjectProp(
+					"A manifest entry",
+					[]string{"ref"},
+					map[string]*jsonschema.Schema{
+						"ref":      sdkhelper.StringProp("Image reference to include in the index"),
+						"platform": sdkhelper.StringProp("Platform in os/arch[/variant] format (auto-detected from image if omitted)"),
+					},
+				)),
+			),
 			"config": sdkhelper.ObjectProp(
-				"Image configuration mutations",
+				"Image configuration mutations (alternative to convenience inputs)",
 				nil,
 				map[string]*jsonschema.Schema{
 					"env":        sdkhelper.ArrayProp("Environment variables", sdkhelper.WithItems(sdkhelper.StringProp("VAR=value"))),
@@ -825,6 +1192,25 @@ func buildInputSchema() *jsonschema.Schema {
 					"user":       sdkhelper.StringProp("User to run as"),
 					"workdir":    sdkhelper.StringProp("Working directory"),
 				},
+			),
+			"entrypoint": stringOrArraySchema(
+				"Container entrypoint (convenience; overrides config.entrypoint). Accepts a string or array of strings",
+			),
+			"cmd": stringOrArraySchema(
+				"Container command (convenience; overrides config.cmd). Accepts a string or array of strings",
+			),
+			"user": sdkhelper.StringProp(
+				"User to run as (convenience; overrides config.user)",
+			),
+			"workdir": sdkhelper.StringProp(
+				"Working directory (convenience; overrides config.workdir)",
+			),
+			"env": stringArrayOrMapSchema(
+				"Environment variables (convenience; overrides config.env). Accepts array of VAR=value strings or a map of key-value pairs",
+			),
+			"labels": sdkhelper.ObjectProp(
+				"Image labels (convenience; overrides config.labels)",
+				nil, nil,
 			),
 		},
 	)

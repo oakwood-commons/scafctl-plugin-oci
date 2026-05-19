@@ -1,0 +1,164 @@
+# Example: Build a Go binary and publish a container image (ko-style).
+#
+# This replicates `ko build` without requiring ko:
+#   1. Cross-compiles a Go binary via `exec` provider
+#   2. Appends it onto a base image, sets entrypoint/labels, and pushes
+#      to the target registry via a single `oci mutate` call
+#
+# Prerequisites:
+#   - Go toolchain installed
+#   - Auth configured for the target registry
+#
+# Setup:
+#   scafctl catalog install oci@0.1.4
+#
+# Run:
+#   scafctl run solution -f examples/ko-replacement.yaml \
+#     -r img=ghcr.io/myorg/bmc-shim:latest \
+#     -r goPackage=./cmd/bmc-shim \
+#     -r srcDir=/path/to/bmc-shim
+#
+# Multi-arch:
+#   Run once per platform, or extend with a second append+mutate pair.
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: ko-replacement
+  version: 1.0.0
+  description: >-
+    Build a Go binary and publish a container image, replacing ko build.
+    Language-agnostic — works with any compiled binary, not just Go.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.4"
+
+spec:
+  resolvers:
+    img:
+      type: string
+      description: Target image reference (e.g., ghcr.io/myorg/app:v1)
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: img
+
+    goPackage:
+      type: string
+      description: Go package to build (e.g., ./cmd/bmc-shim)
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: goPackage
+          - provider: static
+            inputs:
+              value: "."
+
+    srcDir:
+      type: string
+      description: Path to the Go project source directory
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: srcDir
+
+    baseImage:
+      type: string
+      description: Base image for the container (default is chainguard static)
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: baseImage
+          - provider: static
+            inputs:
+              value: cgr.dev/chainguard/static:latest
+
+    platform:
+      type: string
+      description: Target platform (e.g., linux/amd64)
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: platform
+          - provider: static
+            inputs:
+              value: linux/amd64
+
+    expiry:
+      type: string
+      description: Image expiry label value (e.g., 26w)
+      resolve:
+        with:
+          - provider: parameter
+            inputs:
+              key: expiry
+          - provider: static
+            inputs:
+              value: "26w"
+
+    buildDir:
+      description: Temporary directory for the compiled binary
+      resolve:
+        with:
+          - provider: exec
+            inputs:
+              command: mktemp -d
+              raw: true
+
+  workflow:
+    actions:
+      compile:
+        description: Cross-compile the Go binary for the target platform
+        provider: exec
+        inputs:
+          command: go build -trimpath -ldflags="-s -w" -o ${BUILD_DIR}/app
+          args:
+            - rslvr: goPackage
+          env:
+            CGO_ENABLED: "0"
+            GOOS:
+              expr: "_.platform.split('/')[0]"
+            GOARCH:
+              expr: "_.platform.split('/')[1]"
+            BUILD_DIR:
+              rslvr: buildDir
+          workingDir:
+            rslvr: srcDir
+
+      build-image:
+        description: >-
+          Pull base image, append compiled binary, set entrypoint and labels,
+          then push to the target registry — all in one step.
+        dependsOn: [compile]
+        provider: oci
+        inputs:
+          operation: mutate
+          ref:
+            rslvr: baseImage
+          dst:
+            rslvr: img
+          platform:
+            rslvr: platform
+          layers:
+            - rslvr: buildDir
+          entrypoint:
+            - /app
+          labels:
+            quay.expires-after:
+              rslvr: expiry
+
+      cleanup:
+        description: Remove temporary build directory
+        dependsOn: [build-image]
+        provider: exec
+        inputs:
+          command: rm -rf
+          args:
+            - rslvr: buildDir

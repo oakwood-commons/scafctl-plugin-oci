@@ -1,0 +1,55 @@
+# Example: Build a scratch-based OCI image from a local directory.
+#
+# Useful for publishing data-only images (vuln DBs, static assets, etc.)
+# without needing a container build tool.
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/scratch-image.yaml
+#
+# Run:
+#   scafctl run solution -f examples/scratch-image.yaml
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-scratch-image-example
+  version: 1.0.0
+  description: Build and push a scratch-based OCI image from a local directory.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    target:
+      type: string
+      description: Destination image reference
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: ghcr.io/myorg/my-data:latest
+
+    dataDir:
+      type: string
+      description: Local directory to package as a layer
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: ./data
+
+  workflow:
+    actions:
+      build-and-push:
+        description: Build scratch image from local directory and push
+        provider: oci
+        inputs:
+          operation: append
+          ref: scratch
+          dst: "{{ .resolvers.target }}"
+          layers:
+            - "{{ .resolvers.dataDir }}"
