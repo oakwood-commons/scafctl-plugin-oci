@@ -1,0 +1,47 @@
+# Example: Create a multi-arch OCI image index from per-platform images.
+#
+# Assumes per-platform images are already pushed to the registry.
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/multi-arch-index.yaml
+#
+# Run:
+#   scafctl run solution -f examples/multi-arch-index.yaml
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-multi-arch-index-example
+  version: 1.0.0
+  description: Create a multi-arch OCI image index from per-platform images.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    target:
+      type: string
+      description: Target multi-arch image reference
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: ghcr.io/myorg/myapp:latest
+
+  workflow:
+    actions:
+      create-index:
+        description: Create multi-arch index from per-platform images
+        provider: oci
+        inputs:
+          operation: index
+          ref: "{{ .resolvers.target }}"
+          manifests:
+            - ref: "{{ .resolvers.target }}-amd64"
+              platform: linux/amd64
+            - ref: "{{ .resolvers.target }}-arm64"
+              platform: linux/arm64

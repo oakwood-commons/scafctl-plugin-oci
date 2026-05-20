@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
@@ -222,6 +225,16 @@ func TestDescribeWhatIf(t *testing.T) {
 			want:  "a.io/x:1",
 		},
 		{
+			name:  "append without dst",
+			input: map[string]any{"operation": OpAppend, "ref": "ghcr.io/org/app:v1"},
+			want:  "Would append layer(s) to ghcr.io/org/app:v1",
+		},
+		{
+			name:  "append with dst",
+			input: map[string]any{"operation": OpAppend, "ref": "ghcr.io/org/app:v1", "dst": "ghcr.io/org/app:v2"},
+			want:  "→",
+		},
+		{
 			name:  "unknown op",
 			input: map[string]any{"operation": "foo"},
 			want:  "foo",
@@ -408,7 +421,7 @@ func TestMutate(t *testing.T) {
 	assert.Contains(t, data["digest"].(string), "sha256:")
 }
 
-func TestMutate_MissingConfig(t *testing.T) {
+func TestMutate_MissingConfigAndInputs(t *testing.T) {
 	srv, p := setupRegistry(t)
 	pushRandomImage(t, srv, "myorg/app:v1")
 
@@ -420,7 +433,7 @@ func TestMutate_MissingConfig(t *testing.T) {
 		"ref":       ref,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "config")
+	assert.Contains(t, err.Error(), "mutate requires at least one of")
 }
 
 func TestDelete(t *testing.T) {
@@ -721,4 +734,621 @@ func TestPull_InvalidPlatform(t *testing.T) {
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid platform")
+}
+
+func TestMutate_ConvenienceInputs(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        ref,
+		"entrypoint": []any{"/app"},
+		"user":       "1001",
+		"workdir":    "/home/app",
+		"env":        []any{"HOME=/home/app"},
+		"labels":     map[string]any{"version": "2.0"},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Contains(t, data["digest"].(string), "sha256:")
+	assert.NotNil(t, data["size"])
+}
+
+func TestMutate_ConvenienceOverridesConfig(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"config": map[string]any{
+			"user": "old-user",
+		},
+		"user": "new-user", // convenience should win
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+
+	// Verify the new user was applied by fetching the image config.
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, "new-user", cfgFile.Config.User)
+}
+
+func TestMutate_WithLayers(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(dir+"/binary", []byte("app binary"), 0o600))
+
+	tarPath := t.TempDir() + "/layer.tar"
+	createTestTar(t, tarPath, dir+"/binary")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        ref,
+		"layers":     []any{tarPath},
+		"entrypoint": []any{"/binary"},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Contains(t, data["digest"].(string), "sha256:")
+}
+
+func TestMutate_LayersOnly(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(dir+"/data.txt", []byte("data"), 0o600))
+
+	tarPath := t.TempDir() + "/layer.tar"
+	createTestTar(t, tarPath, dir+"/data.txt")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"layers":    []any{tarPath},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+}
+
+func TestMutate_WithDst(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	srcRef := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	dstRef := fmt.Sprintf("%s/myorg/app:v2", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        srcRef,
+		"dst":        dstRef,
+		"entrypoint": []any{"/app"},
+		"labels":     map[string]any{"version": "2.0"},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Equal(t, dstRef, data["ref"])
+
+	// Verify destination image exists and has correct config.
+	imgRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/app"}, cfgFile.Config.Entrypoint)
+	assert.Equal(t, "2.0", cfgFile.Config.Labels["version"])
+}
+
+func TestMutate_CombinedAppendMutateDst(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/base:latest")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(dir+"/app", []byte("binary"), 0o600))
+
+	tarPath := t.TempDir() + "/layer.tar"
+	createTestTar(t, tarPath, dir+"/app")
+
+	ctx := context.Background()
+	srcRef := fmt.Sprintf("%s/myorg/base:latest", srv.Listener.Addr().String())
+	dstRef := fmt.Sprintf("%s/myorg/myapp:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        srcRef,
+		"dst":        dstRef,
+		"layers":     []any{tarPath},
+		"entrypoint": []any{"/app"},
+		"user":       "1001",
+		"labels":     map[string]any{"built-by": "scafctl"},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Equal(t, dstRef, data["ref"])
+	assert.Contains(t, data["digest"].(string), "sha256:")
+}
+
+func TestMutate_InvalidLayersType(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"layers":    42,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "layers")
+}
+
+func TestMutate_InvalidDstType(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        ref,
+		"entrypoint": []any{"/app"},
+		"dst":        42,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dst")
+}
+
+func TestMutate_EmptyDst(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        ref,
+		"entrypoint": []any{"/app"},
+		"dst":        "",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "non-empty")
+}
+
+func TestMutate_StringEntrypoint(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        ref,
+		"entrypoint": "/app",
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+
+	// Verify the entrypoint was normalized to a slice.
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/app"}, cfgFile.Config.Entrypoint)
+}
+
+func TestMutate_MapEnv(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"env":       map[string]any{"HOME": "/app", "PORT": "8080"},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+
+	// Verify the env was normalized.
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Len(t, cfgFile.Config.Env, 2)
+	assert.Contains(t, cfgFile.Config.Env, "HOME=/app")
+	assert.Contains(t, cfgFile.Config.Env, "PORT=8080")
+}
+
+// --- Scratch image tests ---
+
+func TestAppend_Scratch(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+	dstRef := fmt.Sprintf("%s/myorg/scratch-app:v1", addr)
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello"), 0o600))
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpAppend,
+		"ref":       "scratch",
+		"dst":       dstRef,
+		"layers":    []any{dir},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Equal(t, dstRef, data["ref"])
+	assert.Contains(t, data["digest"].(string), "sha256:")
+}
+
+func TestMutate_Scratch(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+	dstRef := fmt.Sprintf("%s/myorg/scratch-configured:v1", addr)
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       "scratch",
+		"dst":       dstRef,
+		"config": map[string]any{
+			"entrypoint": []any{"/bin/sh"},
+			"user":       "1001",
+			"labels": map[string]any{
+				"maintainer": "test",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Equal(t, dstRef, data["ref"])
+
+	ref, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(ref)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/bin/sh"}, cfgFile.Config.Entrypoint)
+	assert.Equal(t, "1001", cfgFile.Config.User)
+	assert.Equal(t, "test", cfgFile.Config.Labels["maintainer"])
+}
+
+func TestAppend_ScratchNoDst(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpAppend,
+		"ref":       "scratch",
+		"layers":    []any{"/tmp/some-layer"},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dst")
+}
+
+func TestMutate_ScratchNoDst(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       "scratch",
+		"config": map[string]any{
+			"entrypoint": []any{"/app"},
+		},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "dst")
+}
+
+// --- Index operation tests ---
+
+func mutateConfigFile(img v1.Image, cfgFile *v1.ConfigFile) (v1.Image, error) {
+	return mutate.ConfigFile(img, cfgFile)
+}
+
+func pushRandomImageWithPlatform(t *testing.T, srv *httptest.Server, repoTag, os, arch string) {
+	t.Helper()
+	ref, err := name.ParseReference(fmt.Sprintf("%s/%s", srv.Listener.Addr().String(), repoTag))
+	require.NoError(t, err)
+
+	img, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	cfgFile.OS = os
+	cfgFile.Architecture = arch
+
+	img, err = mutateConfigFile(img, cfgFile)
+	require.NoError(t, err)
+
+	err = remote.Write(ref, img)
+	require.NoError(t, err)
+}
+
+func TestIndex_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+
+	pushRandomImageWithPlatform(t, srv, "myorg/app:v1-amd64", "linux", "amd64")
+	pushRandomImageWithPlatform(t, srv, "myorg/app:v1-arm64", "linux", "arm64")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       fmt.Sprintf("%s/myorg/app:v1", addr),
+		"manifests": []any{
+			map[string]any{
+				"ref":      fmt.Sprintf("%s/myorg/app:v1-amd64", addr),
+				"platform": "linux/amd64",
+			},
+			map[string]any{
+				"ref":      fmt.Sprintf("%s/myorg/app:v1-arm64", addr),
+				"platform": "linux/arm64",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+	assert.Contains(t, data["digest"].(string), "sha256:")
+	assert.NotEmpty(t, data["mediaType"])
+
+	idxRef, err := name.ParseReference(fmt.Sprintf("%s/myorg/app:v1", addr))
+	require.NoError(t, err)
+	desc, err := remote.Get(idxRef)
+	require.NoError(t, err)
+	idx, err := desc.ImageIndex()
+	require.NoError(t, err)
+	im, err := idx.IndexManifest()
+	require.NoError(t, err)
+	assert.Len(t, im.Manifests, 2)
+}
+
+func TestIndex_SingleManifest(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+
+	pushRandomImageWithPlatform(t, srv, "myorg/app:v1-amd64", "linux", "amd64")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       fmt.Sprintf("%s/myorg/app:v1", addr),
+		"manifests": []any{
+			map[string]any{
+				"ref":      fmt.Sprintf("%s/myorg/app:v1-amd64", addr),
+				"platform": "linux/amd64",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+}
+
+func TestIndex_AutoDetectPlatform(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+
+	pushRandomImageWithPlatform(t, srv, "myorg/app:v1-amd64", "linux", "amd64")
+	pushRandomImageWithPlatform(t, srv, "myorg/app:v1-arm64", "linux", "arm64")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       fmt.Sprintf("%s/myorg/app:v1", addr),
+		"manifests": []any{
+			map[string]any{"ref": fmt.Sprintf("%s/myorg/app:v1-amd64", addr)},
+			map[string]any{"ref": fmt.Sprintf("%s/myorg/app:v1-arm64", addr)},
+		},
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, data["success"])
+
+	idxRef, err := name.ParseReference(fmt.Sprintf("%s/myorg/app:v1", addr))
+	require.NoError(t, err)
+	desc, err := remote.Get(idxRef)
+	require.NoError(t, err)
+	idx, err := desc.ImageIndex()
+	require.NoError(t, err)
+	im, err := idx.IndexManifest()
+	require.NoError(t, err)
+	require.Len(t, im.Manifests, 2)
+
+	platforms := make([]string, 0, 2)
+	for _, m := range im.Manifests {
+		require.NotNil(t, m.Platform)
+		platforms = append(platforms, m.Platform.OS+"/"+m.Platform.Architecture)
+	}
+	assert.Contains(t, platforms, "linux/amd64")
+	assert.Contains(t, platforms, "linux/arm64")
+}
+
+func TestIndex_MissingManifests(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "localhost/foo:bar",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "manifests")
+}
+
+func TestIndex_EmptyManifests(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "localhost/foo:bar",
+		"manifests": []any{},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one")
+}
+
+func TestIndex_InvalidManifestEntry(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "localhost/foo:bar",
+		"manifests": []any{"not-an-object"},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expected object")
+}
+
+func TestIndex_MissingManifestRef(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "localhost/foo:bar",
+		"manifests": []any{
+			map[string]any{"platform": "linux/amd64"},
+		},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ref")
+}
+
+func TestIndex_InvalidPlatform(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       fmt.Sprintf("%s/myorg/app:idx", addr),
+		"manifests": []any{
+			map[string]any{
+				"ref":      fmt.Sprintf("%s/myorg/app:v1", addr),
+				"platform": "bad",
+			},
+		},
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid platform")
+}
+
+func TestIndex_WhatIf(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	desc, err := p.DescribeWhatIf(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "ghcr.io/myorg/app:v1",
+		"manifests": []any{
+			map[string]any{"ref": "a", "platform": "linux/amd64"},
+			map[string]any{"ref": "b", "platform": "linux/arm64"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, desc, "multi-arch index")
+	assert.Contains(t, desc, "2 manifest(s)")
+	assert.Contains(t, desc, "ghcr.io/myorg/app:v1")
+}
+
+func TestIndex_InvalidManifestsType(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpIndex,
+		"ref":       "localhost/foo:bar",
+		"manifests": 42,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "manifests")
 }
