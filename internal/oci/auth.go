@@ -70,10 +70,19 @@ func (k *hostKeychain) Resolve(resource authn.Resource) (authn.Authenticator, er
 	if handler == "" {
 		handler = detectAuthHandler(resource.RegistryStr())
 	}
+
+	// If no handler matched from the hardcoded map, try all available
+	// host handlers. This enables auth for registries not in the
+	// well-known list (e.g., enterprise registries with custom handlers).
 	if handler == "" {
-		return authn.Anonymous, nil
+		return k.tryAllHandlers(hc)
 	}
 
+	return k.tryHandler(hc, handler)
+}
+
+// tryHandler attempts to get a token from a specific auth handler.
+func (k *hostKeychain) tryHandler(hc *sdkplugin.HostServiceClient, handler string) (authn.Authenticator, error) {
 	scope := k.scope
 	if scope == "" {
 		scope = defaultScopeForHandler(handler)
@@ -95,6 +104,36 @@ func (k *hostKeychain) Resolve(resource authn.Resource) (authn.Authenticator, er
 	}
 
 	return &authn.Basic{Username: username, Password: resp.AccessToken}, nil
+}
+
+// tryAllHandlers lists all available host auth handlers and tries each one
+// until one succeeds. This is the fallback path for registries not in the
+// well-known map.
+func (k *hostKeychain) tryAllHandlers(hc *sdkplugin.HostServiceClient) (authn.Authenticator, error) {
+	handlers, _, err := hc.ListAuthHandlers(k.ctx)
+	if err != nil || len(handlers) == 0 {
+		return authn.Anonymous, nil
+	}
+
+	for _, h := range handlers {
+		scope := k.scope
+		if scope == "" {
+			scope = defaultScopeForHandler(h)
+		}
+		resp, err := hc.GetAuthToken(k.ctx, h, scope, 60, false)
+		if err != nil {
+			continue
+		}
+
+		username := k.username
+		if username == "" {
+			username = "x-access-token"
+		}
+
+		return &authn.Basic{Username: username, Password: resp.AccessToken}, nil
+	}
+
+	return authn.Anonymous, nil
 }
 
 // --- scafctlKeychain: reads from scafctl's own credential store ---
@@ -325,4 +364,17 @@ func getSettingString(settings map[string]json.RawMessage, key string) string {
 		return ""
 	}
 	return s
+}
+
+// getSettingBool extracts a boolean value from a json.RawMessage settings map.
+func getSettingBool(settings map[string]json.RawMessage, key string) bool {
+	raw, ok := settings[key]
+	if !ok {
+		return false
+	}
+	var b bool
+	if err := json.Unmarshal(raw, &b); err != nil {
+		return false
+	}
+	return b
 }

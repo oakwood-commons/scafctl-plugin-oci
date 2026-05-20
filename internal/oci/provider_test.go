@@ -1352,3 +1352,590 @@ func TestIndex_InvalidManifestsType(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "manifests")
 }
+
+// --- Config operation tests ---
+
+func TestConfig_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpConfig,
+		"ref":       ref,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["config"])
+	assert.NotEmpty(t, data["digest"])
+	// Config should be valid JSON
+	assert.Contains(t, data["config"].(string), "config")
+}
+
+func TestConfig_MissingRef(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpConfig,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ref")
+}
+
+// --- Tag operation tests ---
+
+func TestTag_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpTag,
+		"ref":       ref,
+		"tag":       "latest",
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.Contains(t, data["tag"].(string), "latest")
+	assert.NotEmpty(t, data["digest"])
+
+	// Verify the new tag exists
+	newRef := fmt.Sprintf("%s/myorg/app:latest", srv.Listener.Addr().String())
+	tagRef, err := name.ParseReference(newRef)
+	require.NoError(t, err)
+	_, err = remote.Get(tagRef)
+	assert.NoError(t, err)
+}
+
+func TestTag_MissingTag(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpTag,
+		"ref":       ref,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "tag")
+}
+
+// --- Annotations tests ---
+
+func TestMutate_Annotations(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	dstRef := fmt.Sprintf("%s/myorg/app:annotated", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"dst":       dstRef,
+		"user":      "nobody",
+		"annotations": map[string]any{
+			"org.opencontainers.image.source": "https://github.com/myorg/app",
+			"org.opencontainers.image.title":  "myapp",
+		},
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["digest"])
+
+	// Verify annotations in manifest
+	imgRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	assert.Contains(t, string(desc.Manifest), "org.opencontainers.image.source")
+}
+
+func TestMutate_AnnotationsInvalidType(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":   OpMutate,
+		"ref":         ref,
+		"user":        "nobody",
+		"annotations": "invalid",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "annotations")
+}
+
+// --- Tag validation tests ---
+
+func TestTagValidation_PlusChar(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpDigest,
+		"ref":       "ghcr.io/myorg/app:0.1.0+dirty",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "+")
+}
+
+// --- WhatIf tests for new operations ---
+
+func TestDescribeWhatIf_Config(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	desc, err := p.DescribeWhatIf(ctx, ProviderName, map[string]any{
+		"operation": OpConfig,
+		"ref":       "ghcr.io/org/app:v1",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, desc, "config")
+	assert.Contains(t, desc, "ghcr.io/org/app:v1")
+}
+
+func TestDescribeWhatIf_Tag(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	desc, err := p.DescribeWhatIf(ctx, ProviderName, map[string]any{
+		"operation": OpTag,
+		"ref":       "ghcr.io/org/app:v1",
+		"tag":       "latest",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, desc, "tag")
+	assert.Contains(t, desc, "ghcr.io/org/app:v1")
+	assert.Contains(t, desc, "latest")
+}
+
+// --- Insecure setting test ---
+
+func TestInsecureSetting(t *testing.T) {
+	p := &Plugin{}
+	err := p.ConfigureProvider(context.Background(), ProviderName, sdkplugin.ProviderConfig{
+		Settings: map[string]json.RawMessage{
+			"insecure": json.RawMessage(`true`),
+		},
+	})
+	require.NoError(t, err)
+	assert.True(t, p.insecure)
+}
+
+// --- Validate operation tests ---
+
+func TestValidate_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpValidate,
+		"ref":       ref,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["digest"])
+	assert.Greater(t, data["layerCount"], 0)
+}
+
+func TestValidate_MissingRef(t *testing.T) {
+	p := &Plugin{}
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpValidate,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ref")
+}
+
+// --- Blob operation tests ---
+
+func TestBlob_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	// First get the digest of a layer
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	require.NotEmpty(t, layers)
+	layerDigest, err := layers[0].Digest()
+	require.NoError(t, err)
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpBlob,
+		"ref":       ref,
+		"digest":    layerDigest.String(),
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.Equal(t, layerDigest.String(), data["digest"])
+}
+
+func TestBlob_WriteToFile(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	layerDigest, err := layers[0].Digest()
+	require.NoError(t, err)
+
+	outPath := filepath.Join(t.TempDir(), "blob.bin")
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpBlob,
+		"ref":       ref,
+		"digest":    layerDigest.String(),
+		"path":      outPath,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	info, err := os.Stat(outPath)
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0))
+}
+
+func TestBlob_MissingDigest(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpBlob,
+		"ref":       ref,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "digest")
+}
+
+// --- Export operation tests ---
+
+func TestExport_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	outPath := filepath.Join(t.TempDir(), "export.tar")
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpExport,
+		"ref":       ref,
+		"path":      outPath,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.Equal(t, outPath, data["path"])
+
+	info, err := os.Stat(outPath)
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0))
+}
+
+func TestExport_MissingPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpExport,
+		"ref":       ref,
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "path")
+}
+
+// --- Flatten operation tests ---
+
+func TestFlatten_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	addr := srv.Listener.Addr().String()
+	ref := fmt.Sprintf("%s/myorg/app:v1", addr)
+	dstRef := fmt.Sprintf("%s/myorg/app:flat", addr)
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpFlatten,
+		"ref":       ref,
+		"dst":       dstRef,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["digest"])
+
+	// Verify the flattened image has exactly 1 layer
+	flatRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(flatRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	assert.Len(t, layers, 1)
+}
+
+// --- Rebase operation tests ---
+
+func TestRebase_MissingOldBase(t *testing.T) {
+	p := &Plugin{}
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpRebase,
+		"ref":       "ghcr.io/org/app:v1",
+		"new_base":  "ghcr.io/org/base:v2",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "old_base")
+}
+
+func TestRebase_MissingNewBase(t *testing.T) {
+	p := &Plugin{}
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpRebase,
+		"ref":       "ghcr.io/org/app:v1",
+		"old_base":  "ghcr.io/org/base:v1",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "new_base")
+}
+
+// --- Mutate output (tarball) tests ---
+
+func TestMutate_OutputToTarball(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	outPath := filepath.Join(t.TempDir(), "mutated.tar")
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       ref,
+		"user":      "nobody",
+		"output":    outPath,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.Equal(t, outPath, data["path"])
+
+	info, err := os.Stat(outPath)
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0))
+}
+
+// --- Mutate exposed_ports tests ---
+
+func TestMutate_ExposedPorts(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	dstRef := fmt.Sprintf("%s/myorg/app:ports", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":     OpMutate,
+		"ref":           ref,
+		"dst":           dstRef,
+		"exposed_ports": []any{"8080/tcp", "443/tcp"},
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	imgRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Contains(t, cfgFile.Config.ExposedPorts, "8080/tcp")
+	assert.Contains(t, cfgFile.Config.ExposedPorts, "443/tcp")
+}
+
+// --- Mutate set_platform tests ---
+
+func TestMutate_SetPlatform(t *testing.T) {
+	srv, p := setupRegistry(t)
+	pushRandomImage(t, srv, "myorg/app:v1")
+
+	ctx := context.Background()
+	ref := fmt.Sprintf("%s/myorg/app:v1", srv.Listener.Addr().String())
+	dstRef := fmt.Sprintf("%s/myorg/app:plat", srv.Listener.Addr().String())
+
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":    OpMutate,
+		"ref":          ref,
+		"dst":          dstRef,
+		"set_platform": "linux/arm64",
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	imgRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	desc, err := remote.Get(imgRef)
+	require.NoError(t, err)
+	img, err := desc.Image()
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, "linux", cfgFile.OS)
+	assert.Equal(t, "arm64", cfgFile.Architecture)
+}
+
+// --- WhatIf tests for new operations ---
+
+func TestDescribeWhatIf_NewOps(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	tests := []struct {
+		name  string
+		input map[string]any
+		want  string
+	}{
+		{
+			name:  "validate",
+			input: map[string]any{"operation": OpValidate, "ref": "ghcr.io/org/app:v1"},
+			want:  "validate",
+		},
+		{
+			name:  "blob",
+			input: map[string]any{"operation": OpBlob, "ref": "ghcr.io/org/app:v1", "digest": "sha256:abc"},
+			want:  "blob",
+		},
+		{
+			name:  "export",
+			input: map[string]any{"operation": OpExport, "ref": "ghcr.io/org/app:v1", "path": "/tmp/fs.tar"},
+			want:  "export",
+		},
+		{
+			name:  "flatten",
+			input: map[string]any{"operation": OpFlatten, "ref": "ghcr.io/org/app:v1"},
+			want:  "flatten",
+		},
+		{
+			name:  "rebase",
+			input: map[string]any{"operation": OpRebase, "ref": "ghcr.io/org/app:v1", "old_base": "base:v1", "new_base": "base:v2"},
+			want:  "rebase",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desc, err := p.DescribeWhatIf(ctx, ProviderName, tt.input)
+			require.NoError(t, err)
+			assert.Contains(t, desc, tt.want)
+		})
+	}
+}
+
+// --- Rebase happy-path integration test ---
+
+func TestRebase_HappyPath(t *testing.T) {
+	srv, p := setupRegistry(t)
+	addr := srv.Listener.Addr().String()
+
+	// Push base-v1 (the original base image)
+	pushRandomImage(t, srv, "myorg/base:v1")
+
+	// Build app image on top of base-v1 by appending a layer
+	baseRef := fmt.Sprintf("%s/myorg/base:v1", addr)
+	appRef := fmt.Sprintf("%s/myorg/app:v1", addr)
+
+	// Create a temp layer file
+	layerDir := t.TempDir()
+	layerFile := filepath.Join(layerDir, "app.txt")
+	require.NoError(t, os.WriteFile(layerFile, []byte("app-content"), 0o600))
+
+	_, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpAppend,
+		"ref":       baseRef,
+		"dst":       appRef,
+		"layers":    []any{layerFile},
+	})
+	require.NoError(t, err)
+
+	// Push base-v2 (the new base image)
+	pushRandomImage(t, srv, "myorg/base:v2")
+
+	// Rebase app from base-v1 onto base-v2
+	dstRef := fmt.Sprintf("%s/myorg/app:rebased", addr)
+	out, err := p.ExecuteProvider(context.Background(), ProviderName, map[string]any{
+		"operation": OpRebase,
+		"ref":       appRef,
+		"old_base":  baseRef,
+		"new_base":  fmt.Sprintf("%s/myorg/base:v2", addr),
+		"dst":       dstRef,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["digest"])
+
+	// Verify the rebased image exists
+	imgRef, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	_, err = remote.Get(imgRef)
+	assert.NoError(t, err)
+}
