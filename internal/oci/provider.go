@@ -3,6 +3,7 @@ package oci
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/go-containerregistry/pkg/v1/validate"
@@ -271,6 +273,25 @@ func (p *Plugin) parseReference(ref string) (name.Reference, error) {
 		return nil, fmt.Errorf("parsing reference %q: %w", ref, err)
 	}
 	return parsed, nil
+}
+
+// isUnsupported checks if an error indicates the OCI registry operation is unsupported.
+// Used to detect when a registry doesn't support tag-based manifest deletion.
+func isUnsupported(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for a structured transport.Error with the UNSUPPORTED OCI error code.
+	var terr *transport.Error
+	if errors.As(err, &terr) {
+		for _, diag := range terr.Errors {
+			if diag.Code == transport.UnsupportedErrorCode {
+				return true
+			}
+		}
+	}
+	// Fall back to string matching for non-standard registry responses.
+	return strings.Contains(err.Error(), "UNSUPPORTED")
 }
 
 // parsePlatform parses an os/arch[/variant] string into a v1.Platform.
@@ -652,33 +673,63 @@ func (p *Plugin) executeConfig(ctx context.Context, input map[string]any) (*sdkp
 		return nil, err
 	}
 
-	platOpts, err := platformOption(input)
+	// Fetch the descriptor first.
+	desc, err := remote.Get(imgRef, p.remoteOptions(ctx)...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching descriptor for %q: %w", ref, err)
 	}
 
-	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
-	if err != nil {
-		return nil, fmt.Errorf("fetching image %q: %w", ref, err)
-	}
+	// For multi-arch (index), just return the index manifest.
+	// For single image, return the image config.
+	var digest v1.Hash
+	var mediaType types.MediaType
+	var config []byte
 
-	img, err := desc.Image()
-	if err != nil {
-		return nil, fmt.Errorf("resolving image %q: %w", ref, err)
-	}
-
-	rawCfg, err := img.RawConfigFile()
-	if err != nil {
-		return nil, fmt.Errorf("reading config for %q: %w", ref, err)
+	if desc.MediaType.IsIndex() {
+		// Index (multi-arch): return the index manifest as config.
+		idx, err := desc.ImageIndex()
+		if err != nil {
+			return nil, fmt.Errorf("reading index %q: %w", ref, err)
+		}
+		digest, err = idx.Digest()
+		if err != nil {
+			return nil, fmt.Errorf("getting index digest: %w", err)
+		}
+		mediaType, err = idx.MediaType()
+		if err != nil {
+			return nil, fmt.Errorf("getting index mediaType: %w", err)
+		}
+		config, err = idx.RawManifest()
+		if err != nil {
+			return nil, fmt.Errorf("getting index manifest: %w", err)
+		}
+	} else {
+		// Single image: return the image config.
+		img, err := desc.Image()
+		if err != nil {
+			return nil, fmt.Errorf("reading image %q: %w", ref, err)
+		}
+		digest, err = img.Digest()
+		if err != nil {
+			return nil, fmt.Errorf("getting image digest: %w", err)
+		}
+		mediaType, err = img.MediaType()
+		if err != nil {
+			return nil, fmt.Errorf("getting image mediaType: %w", err)
+		}
+		config, err = img.RawConfigFile()
+		if err != nil {
+			return nil, fmt.Errorf("getting image config: %w", err)
+		}
 	}
 
 	return &sdkprovider.Output{
 		Data: map[string]any{
 			"success":   true,
 			"ref":       ref,
-			"digest":    desc.Digest.String(),
-			"mediaType": string(desc.MediaType),
-			"config":    string(rawCfg),
+			"digest":    digest.String(),
+			"mediaType": string(mediaType),
+			"config":    string(config),
 		},
 	}, nil
 }
@@ -961,45 +1012,99 @@ func (p *Plugin) executeValidate(ctx context.Context, input map[string]any) (*sd
 		return nil, err
 	}
 
-	platOpts, err := platformOption(input)
+	// Fetch the descriptor first.
+	desc, err := remote.Get(imgRef, p.remoteOptions(ctx)...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching descriptor for %q: %w", ref, err)
 	}
 
-	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
-	if err != nil {
-		return nil, fmt.Errorf("fetching image %q: %w", ref, err)
+	// For multi-arch (index), validate the index structure.
+	// For single image, validate the image.
+	var allValid = true
+	var validationErr string
+	var digest v1.Hash
+	var mediaType types.MediaType
+	var layerCount int
+
+	if desc.MediaType.IsIndex() {
+		// Index (multi-arch): validate the index structure (not individual platform manifests).
+		idx, err := desc.ImageIndex()
+		if err != nil {
+			return nil, fmt.Errorf("reading index %q: %w", ref, err)
+		}
+		digest, err = idx.Digest()
+		if err != nil {
+			allValid = false
+			validationErr = fmt.Sprintf("getting index digest: %v", err)
+		}
+		mediaType, err = idx.MediaType()
+		if err != nil {
+			allValid = false
+			if validationErr == "" {
+				validationErr = fmt.Sprintf("getting index media type: %v", err)
+			}
+		}
+		// Index doesn't have layers like an image does, so layer count is 0.
+		layerCount = 0
+
+		// Validate the index structure itself.
+		if _, err := idx.IndexManifest(); err != nil {
+			allValid = false
+			if validationErr == "" {
+				validationErr = fmt.Sprintf("reading index manifest: %v", err)
+			}
+		}
+	} else {
+		// Single image: validate the image.
+		img, err := desc.Image()
+		if err != nil {
+			return nil, fmt.Errorf("reading image %q: %w", ref, err)
+		}
+
+		if err := validateImage(img); err != nil {
+			return &sdkprovider.Output{
+				Data: map[string]any{
+					"success": false,
+					"ref":     ref,
+					"error":   err.Error(),
+				},
+			}, nil
+		}
+
+		digest, err = img.Digest()
+		if err != nil {
+			allValid = false
+			validationErr = fmt.Sprintf("getting image digest: %v", err)
+		}
+		mediaType, err = img.MediaType()
+		if err != nil {
+			allValid = false
+			if validationErr == "" {
+				validationErr = fmt.Sprintf("getting image media type: %v", err)
+			}
+		}
+		layers, err := img.Layers()
+		if err != nil {
+			allValid = false
+			if validationErr == "" {
+				validationErr = fmt.Sprintf("getting image layers: %v", err)
+			}
+		}
+		layerCount = len(layers)
 	}
 
-	img, err := desc.Image()
-	if err != nil {
-		return nil, fmt.Errorf("resolving image %q: %w", ref, err)
+	result := map[string]any{
+		"success":    allValid,
+		"ref":        ref,
+		"digest":     digest.String(),
+		"mediaType":  string(mediaType),
+		"layerCount": layerCount,
+	}
+	if validationErr != "" {
+		result["error"] = validationErr
 	}
 
-	if err := validateImage(img); err != nil {
-		return &sdkprovider.Output{
-			Data: map[string]any{
-				"success": false,
-				"ref":     ref,
-				"error":   err.Error(),
-			},
-		}, nil
-	}
-
-	layers, err := img.Layers()
-	if err != nil {
-		return nil, fmt.Errorf("reading layers: %w", err)
-	}
-
-	return &sdkprovider.Output{
-		Data: map[string]any{
-			"success":    true,
-			"ref":        ref,
-			"digest":     desc.Digest.String(),
-			"mediaType":  string(desc.MediaType),
-			"layerCount": len(layers),
-		},
-	}, nil
+	return &sdkprovider.Output{Data: result}, nil
 }
 
 // executeBlob reads a blob by digest from a repository.
@@ -1324,14 +1429,40 @@ func (p *Plugin) executeDelete(ctx context.Context, input map[string]any) (*sdkp
 		return nil, err
 	}
 
-	if err := remote.Delete(imgRef, p.remoteOptions(ctx)...); err != nil {
-		return nil, fmt.Errorf("deleting %q: %w", ref, err)
+	// First try tag-based DELETE (works on most registries and the test registry).
+	// If the registry returns UNSUPPORTED, fall back to digest-based DELETE as a
+	// spec-aligned fallback for registries that implement manifest deletion by digest.
+	deleteErr := remote.Delete(imgRef, p.remoteOptions(ctx)...)
+	if deleteErr == nil {
+		return &sdkprovider.Output{
+			Data: map[string]any{
+				"success": true,
+				"ref":     ref,
+			},
+		}, nil
+	}
+
+	// Check if the registry returned UNSUPPORTED — if so, retry with digest.
+	if !isUnsupported(deleteErr) {
+		return nil, fmt.Errorf("deleting %q: %w", ref, deleteErr)
+	}
+
+	// Resolve to digest and retry.
+	desc, err := remote.Get(imgRef, p.remoteOptions(ctx)...)
+	if err != nil {
+		return nil, fmt.Errorf("resolving %q for digest-based delete: %w", ref, err)
+	}
+
+	digestRef := imgRef.Context().Digest(desc.Digest.String())
+	if err := remote.Delete(digestRef, p.remoteOptions(ctx)...); err != nil {
+		return nil, fmt.Errorf("deleting %q by digest: %w", ref, err)
 	}
 
 	return &sdkprovider.Output{
 		Data: map[string]any{
 			"success": true,
 			"ref":     ref,
+			"digest":  desc.Digest.String(),
 		},
 	}, nil
 }

@@ -1,8 +1,8 @@
 # Example: Get the digest of a public image (no auth required).
 #
 # Setup:
-#   task release:local VERSION=0.1.0
-#   scafctl plugins install -f examples/digest.yaml
+#   task release:local VERSION=0.4.0
+#   cldctl plugins install -f examples/digest.yaml
 #
 # Run resolvers (shows OCI metadata):
 #   scafctl run resolver -f examples/digest.yaml
@@ -20,7 +20,7 @@ bundle:
   plugins:
     - name: oci
       kind: provider
-      version: "0.1.0"
+      version: ">=0.3.0"
 
 spec:
   resolvers:

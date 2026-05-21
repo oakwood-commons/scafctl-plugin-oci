@@ -117,8 +117,12 @@ func TestScafctlKeychain_Resolve(t *testing.T) {
 }
 
 func TestScafctlKeychain_NoConfig(t *testing.T) {
-	// Point to a non-existent config dir.
+	// Point to a non-existent config dir and home to prevent finding
+	// real container auth files on the test machine.
 	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("USERPROFILE", "/nonexistent/home")
+	t.Setenv("HOME", "/nonexistent/home")
+	t.Setenv("XDG_RUNTIME_DIR", "")
 
 	kc := &scafctlKeychain{}
 	reg, err := name.NewRegistry("ghcr.io")
@@ -132,18 +136,23 @@ func TestDetectAuthHandler(t *testing.T) {
 	tests := []struct {
 		registry string
 		handler  string
+		known    bool
 	}{
-		{"ghcr.io", "github"},
-		{"gcr.io", "gcp"},
-		{"us-docker.pkg.dev", "gcp"},
-		{"myacr.azurecr.io", "entra"},
-		{"registry.redhat.io", ""},
-		{"quay.io", ""},
-		{"docker.io", ""},
+		{"ghcr.io", "github", true},
+		{"gcr.io", "gcp", true},
+		{"us-docker.pkg.dev", "gcp", true},
+		{"myacr.azurecr.io", "entra", true},
+		{"registry.redhat.io", "", false},
+		{"quay.io", "", false},
+		{"docker.io", "", true},
+		{"index.docker.io", "", true},
+		{"registry-1.docker.io", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.registry, func(t *testing.T) {
-			assert.Equal(t, tt.handler, detectAuthHandler(tt.registry))
+			handler, known := detectAuthHandler(tt.registry)
+			assert.Equal(t, tt.handler, handler)
+			assert.Equal(t, tt.known, known)
 		})
 	}
 }
@@ -200,5 +209,68 @@ func TestScafctlConfigPath_XDGOverride(t *testing.T) {
 	// When XDG_CONFIG_HOME is set, it takes priority over HOME.
 	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
 	path := scafctlConfigPath("registries.json")
-	assert.Equal(t, "/custom/config/scafctl/registries.json", path)
+	assert.Equal(t, filepath.Join("/custom/config", "scafctl", "registries.json"), path)
+}
+
+func TestLookupRegistryHandler(t *testing.T) {
+	// Create a temp dir with a config.yaml containing customOAuth2 entries.
+	tmpDir := t.TempDir()
+	cldctlDir := filepath.Join(tmpDir, "cldctl")
+	require.NoError(t, os.MkdirAll(cldctlDir, 0o750))
+
+	configYAML := `auth:
+  customOAuth2:
+    - name: ford-quay
+      registry: fcr.ford.com
+      registryUsername: $oauthtoken
+    - name: corp-harbor
+      registry: harbor.example.com
+      registryUsername: robot$ci
+`
+	require.NoError(t, os.WriteFile(filepath.Join(cldctlDir, "config.yaml"), []byte(configYAML), 0o600))
+
+	// Point configPath to our temp dir.
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	t.Run("known enterprise registry", func(t *testing.T) {
+		mapping := lookupRegistryHandler("fcr.ford.com")
+		require.NotNil(t, mapping)
+		assert.Equal(t, "ford-quay", mapping.Handler)
+		assert.Equal(t, "$oauthtoken", mapping.Username)
+	})
+
+	t.Run("second custom registry", func(t *testing.T) {
+		mapping := lookupRegistryHandler("harbor.example.com")
+		require.NotNil(t, mapping)
+		assert.Equal(t, "corp-harbor", mapping.Handler)
+		assert.Equal(t, "robot$ci", mapping.Username)
+	})
+
+	t.Run("unknown registry returns nil", func(t *testing.T) {
+		mapping := lookupRegistryHandler("unknown.example.com")
+		assert.Nil(t, mapping)
+	})
+
+	t.Run("well-known registry not in customOAuth2 returns nil", func(t *testing.T) {
+		mapping := lookupRegistryHandler("ghcr.io")
+		assert.Nil(t, mapping)
+	})
+}
+
+func TestLookupRegistryHandler_NoConfig(t *testing.T) {
+	// Point to an empty temp dir — no config.yaml exists.
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	mapping := lookupRegistryHandler("fcr.ford.com")
+	assert.Nil(t, mapping)
+}
+
+func TestLookupRegistryHandler_MalformedYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	cldctlDir := filepath.Join(tmpDir, "cldctl")
+	require.NoError(t, os.MkdirAll(cldctlDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(cldctlDir, "config.yaml"), []byte("not: [valid: yaml:"), 0o600))
+
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	mapping := lookupRegistryHandler("fcr.ford.com")
+	assert.Nil(t, mapping)
 }
