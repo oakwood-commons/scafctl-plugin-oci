@@ -1996,7 +1996,7 @@ func TestIsUnsupported(t *testing.T) {
 
 func TestConfig_MultiArchIndex(t *testing.T) {
 	srv, p := setupRegistry(t)
-	
+
 	// Create and push a multi-arch index
 	ref := fmt.Sprintf("%s/myorg/app:multi", srv.Listener.Addr().String())
 	createAndPushMultiArchIndex(t, ref)
@@ -2020,7 +2020,7 @@ func TestConfig_MultiArchIndex(t *testing.T) {
 
 func TestValidate_MultiArchIndex(t *testing.T) {
 	srv, p := setupRegistry(t)
-	
+
 	// Create and push a multi-arch index
 	ref := fmt.Sprintf("%s/myorg/app:multi", srv.Listener.Addr().String())
 	createAndPushMultiArchIndex(t, ref)
@@ -2042,7 +2042,7 @@ func TestValidate_MultiArchIndex(t *testing.T) {
 // createAndPushMultiArchIndex is a helper to create a multi-arch image index
 func createAndPushMultiArchIndex(t *testing.T, ref string) {
 	t.Helper()
-	
+
 	parsedRef, err := name.ParseReference(ref)
 	require.NoError(t, err)
 
