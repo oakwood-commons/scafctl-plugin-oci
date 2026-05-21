@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
+	"gopkg.in/yaml.v3"
 )
 
 // registryAuthHandlers maps well-known registries to the scafctl auth handler
@@ -24,6 +25,7 @@ var registryAuthHandlers = map[string]string{
 	"azurecr.io":           "entra",
 	"docker.io":            "",
 	"registry-1.docker.io": "",
+	"index.docker.io":      "",
 }
 
 // --- staticKeychain: explicit credentials from settings ---
@@ -68,21 +70,38 @@ func (k *hostKeychain) Resolve(resource authn.Resource) (authn.Authenticator, er
 
 	handler := k.handler
 	if handler == "" {
-		handler = detectAuthHandler(resource.RegistryStr())
+		detected, known := detectAuthHandler(resource.RegistryStr())
+		if known {
+			if detected == "" {
+				// Registry is explicitly mapped as "no handler needed" (e.g., docker.io).
+				return authn.Anonymous, nil
+			}
+			handler = detected
+		}
 	}
 
-	// If no handler matched from the hardcoded map, try all available
-	// host handlers. This enables auth for registries not in the
-	// well-known list (e.g., enterprise registries with custom handlers).
+	// For unknown registries, look up the handler from the host's config.
+	// customOAuth2 entries in config.yaml map registries to auth handlers
+	// (e.g., fcr.ford.com → ford-quay).
+	registryHost := resource.RegistryStr()
+	var mappedUsername string
 	if handler == "" {
-		return k.tryAllHandlers(hc)
+		if mapping := lookupRegistryHandler(registryHost); mapping != nil {
+			handler = mapping.Handler
+			mappedUsername = mapping.Username
+		}
 	}
 
-	return k.tryHandler(hc, handler)
+	// Last resort: try registry hostname itself as the handler.
+	if handler == "" {
+		handler = registryHost
+	}
+
+	return k.tryHandler(hc, handler, registryHost, mappedUsername)
 }
 
 // tryHandler attempts to get a token from a specific auth handler.
-func (k *hostKeychain) tryHandler(hc *sdkplugin.HostServiceClient, handler string) (authn.Authenticator, error) {
+func (k *hostKeychain) tryHandler(hc *sdkplugin.HostServiceClient, handler, registryHost, mappedUsername string) (authn.Authenticator, error) {
 	scope := k.scope
 	if scope == "" {
 		scope = defaultScopeForHandler(handler)
@@ -100,40 +119,28 @@ func (k *hostKeychain) tryHandler(hc *sdkplugin.HostServiceClient, handler strin
 
 	username := k.username
 	if username == "" {
+		// Prefer username from customOAuth2 config.yaml mapping (e.g., $oauthtoken).
+		if mappedUsername != "" {
+			username = mappedUsername
+		}
+	}
+	if username == "" {
+		// Fall back to registries.json for a username hint.
+		// Look up by registry hostname first (keys in registries.json are
+		// registry hostnames), then fall back to handler name.
+		if cfg, err := loadRegistriesConfig(); err == nil {
+			if entry, ok := cfg.Registries[registryHost]; ok && entry.Username != "" {
+				username = entry.Username
+			} else if entry, ok := cfg.Registries[handler]; ok && entry.Username != "" {
+				username = entry.Username
+			}
+		}
+	}
+	if username == "" {
 		username = "x-access-token"
 	}
 
 	return &authn.Basic{Username: username, Password: resp.AccessToken}, nil
-}
-
-// tryAllHandlers lists all available host auth handlers and tries each one
-// until one succeeds. This is the fallback path for registries not in the
-// well-known map.
-func (k *hostKeychain) tryAllHandlers(hc *sdkplugin.HostServiceClient) (authn.Authenticator, error) {
-	handlers, _, err := hc.ListAuthHandlers(k.ctx)
-	if err != nil || len(handlers) == 0 {
-		return authn.Anonymous, nil
-	}
-
-	for _, h := range handlers {
-		scope := k.scope
-		if scope == "" {
-			scope = defaultScopeForHandler(h)
-		}
-		resp, err := hc.GetAuthToken(k.ctx, h, scope, 60, false)
-		if err != nil {
-			continue
-		}
-
-		username := k.username
-		if username == "" {
-			username = "x-access-token"
-		}
-
-		return &authn.Basic{Username: username, Password: resp.AccessToken}, nil
-	}
-
-	return authn.Anonymous, nil
 }
 
 // --- scafctlKeychain: reads from scafctl's own credential store ---
@@ -167,31 +174,30 @@ func (k *scafctlKeychain) Resolve(resource authn.Resource) (authn.Authenticator,
 	registry := resource.RegistryStr()
 
 	cfg, err := loadRegistriesConfig()
-	if err != nil {
-		return authn.Anonymous, nil
-	}
-
-	// Look up registry in scafctl's config.
-	entry, ok := cfg.Registries[registry]
-	if !ok {
-		// Try canonical name mapping (index.docker.io ↔ docker.io).
-		if registry == name.DefaultRegistry {
-			entry, ok = cfg.Registries["docker.io"]
-		}
+	if err == nil {
+		// Look up registry in scafctl's config.
+		entry, ok := cfg.Registries[registry]
 		if !ok {
-			return authn.Anonymous, nil
+			// Try canonical name mapping (index.docker.io ↔ docker.io).
+			if registry == name.DefaultRegistry {
+				entry, ok = cfg.Registries["docker.io"]
+			}
+		}
+
+		if ok {
+			// If there's a containerAuthFile, read creds from it.
+			if entry.ContainerAuthFile != "" {
+				auth, err := readContainerAuth(entry.ContainerAuthFile, registry)
+				if err == nil && auth != nil {
+					return auth, nil
+				}
+			}
 		}
 	}
 
-	// If there's a containerAuthFile, read creds from it.
-	if entry.ContainerAuthFile != "" {
-		auth, err := readContainerAuth(entry.ContainerAuthFile, registry)
-		if err == nil && auth != nil {
-			return auth, nil
-		}
-	}
-
-	// Try the default scafctl container auth locations.
+	// Always try the default container auth locations, even if the registry
+	// wasn't in registries.json. Credentials stored by `cldctl catalog login`
+	// or similar tools may be in these files.
 	for _, path := range scafctlAuthFilePaths() {
 		auth, err := readContainerAuth(path, registry)
 		if err == nil && auth != nil {
@@ -203,20 +209,26 @@ func (k *scafctlKeychain) Resolve(resource authn.Resource) (authn.Authenticator,
 }
 
 // loadRegistriesConfig reads scafctl's registries.json.
+// Checks both scafctl and cldctl config directories.
 func loadRegistriesConfig() (*registriesConfig, error) {
-	path := scafctlConfigPath("registries.json")
-	if path == "" {
-		return nil, fmt.Errorf("cannot determine config directory")
+	for _, app := range []string{"scafctl", "cldctl"} {
+		path := configPath(app, "registries.json")
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // path from config, not user input
+		if err != nil {
+			continue
+		}
+		var cfg registriesConfig
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			continue
+		}
+		if len(cfg.Registries) > 0 {
+			return &cfg, nil
+		}
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // path from scafctl config, not user input
-	if err != nil {
-		return nil, err
-	}
-	var cfg registriesConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
+	return nil, fmt.Errorf("no registries config found")
 }
 
 // readContainerAuth reads a Docker/Podman-format auth file and extracts
@@ -259,10 +271,10 @@ func readContainerAuth(path, registry string) (authn.Authenticator, error) {
 	return &authn.Basic{Username: parts[0], Password: parts[1]}, nil
 }
 
-// scafctlConfigPath returns the path to a file in scafctl's config directory.
-func scafctlConfigPath(filename string) string {
+// configPath returns the path to a file in an application's config directory.
+func configPath(app, filename string) string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "scafctl", filename)
+		return filepath.Join(xdg, app, filename)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -270,10 +282,15 @@ func scafctlConfigPath(filename string) string {
 	}
 	if runtime.GOOS == "windows" {
 		if appdata := os.Getenv("LOCALAPPDATA"); appdata != "" {
-			return filepath.Join(appdata, "scafctl", filename)
+			return filepath.Join(appdata, app, filename)
 		}
 	}
-	return filepath.Join(home, ".config", "scafctl", filename)
+	return filepath.Join(home, ".config", app, filename)
+}
+
+// scafctlConfigPath returns the path to a file in scafctl's config directory.
+func scafctlConfigPath(filename string) string {
+	return configPath("scafctl", filename)
 }
 
 // scafctlAuthFilePaths returns candidate paths for scafctl's container auth files.
@@ -291,18 +308,72 @@ func scafctlAuthFilePaths() []string {
 	return paths
 }
 
+// --- host config: resolve registry → auth handler from config.yaml ---
+
+// registryHandlerMapping holds a resolved registry-to-handler mapping from config.yaml.
+type registryHandlerMapping struct {
+	Handler  string
+	Username string
+}
+
+// hostConfig represents the auth-relevant portion of config.yaml.
+type hostConfig struct {
+	Auth struct {
+		CustomOAuth2 []customOAuth2Entry `yaml:"customOAuth2"`
+	} `yaml:"auth"`
+}
+
+type customOAuth2Entry struct {
+	Name             string `yaml:"name"`
+	Registry         string `yaml:"registry"`
+	RegistryUsername string `yaml:"registryUsername"`
+}
+
+// lookupRegistryHandler checks the host's config.yaml for a customOAuth2 entry
+// whose registry field matches the target. This maps enterprise registries
+// (e.g., fcr.ford.com) to their auth handler (e.g., ford-quay).
+func lookupRegistryHandler(registry string) *registryHandlerMapping {
+	for _, app := range []string{"cldctl", "scafctl"} {
+		cfgPath := configPath(app, "config.yaml")
+		if cfgPath == "" {
+			continue
+		}
+		data, err := os.ReadFile(cfgPath) //nolint:gosec // path from config dir, not user input
+		if err != nil {
+			continue
+		}
+		var cfg hostConfig
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			continue
+		}
+		for _, entry := range cfg.Auth.CustomOAuth2 {
+			if entry.Registry == registry && entry.Name != "" {
+				return &registryHandlerMapping{
+					Handler:  entry.Name,
+					Username: entry.RegistryUsername,
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // --- helpers ---
 
-func detectAuthHandler(registry string) string {
+// detectAuthHandler returns the auth handler for a known registry.
+// Returns (handler, true) if the registry is in the well-known map
+// (handler may be "" meaning "no handler needed, use anonymous").
+// Returns ("", false) if the registry is unknown.
+func detectAuthHandler(registry string) (string, bool) {
 	if h, ok := registryAuthHandlers[registry]; ok {
-		return h
+		return h, true
 	}
 	for suffix, handler := range registryAuthHandlers {
 		if handler != "" && strings.HasSuffix(registry, "."+suffix) {
-			return handler
+			return handler, true
 		}
 	}
-	return ""
+	return "", false
 }
 
 func defaultScopeForHandler(handler string) string {
@@ -318,9 +389,14 @@ func defaultScopeForHandler(handler string) string {
 
 // buildKeychain constructs a multi-keychain with priority:
 //  1. Explicit credentials from settings (username/password)
-//  2. Host auth token via broker (scafctl solution context)
-//  3. scafctl credential store (scafctl catalog login)
-//  4. Default Docker/Podman keychain (~/.docker/config.json)
+//  2. scafctl/cldctl credential store (per-registry creds from catalog login)
+//  3. Default Docker/Podman keychain (~/.docker/config.json)
+//  4. Host auth token via broker (scafctl/cldctl solution context)
+//
+// The host broker is last because it returns handler-scoped tokens (e.g.,
+// a GitHub token) that may not match the target registry's account. Per-
+// registry credentials from the credential store or Docker config are more
+// specific and should take precedence.
 //
 // Anonymous access works naturally: if none of the keychains return
 // credentials for a registry, go-containerregistry falls through to
@@ -334,7 +410,13 @@ func buildKeychain(ctx context.Context, registryHost, username, password, authHa
 		keychains = append(keychains, newStaticKeychain(registryHost, username, password))
 	}
 
-	// Priority 2: Host auth token (from scafctl solution context).
+	// Priority 2: scafctl/cldctl's own credential store.
+	keychains = append(keychains, &scafctlKeychain{})
+
+	// Priority 3: Docker/Podman config (~/.docker/config.json).
+	keychains = append(keychains, authn.DefaultKeychain)
+
+	// Priority 4: Host auth token (from scafctl/cldctl solution context).
 	if ctx != nil {
 		keychains = append(keychains, &hostKeychain{
 			ctx:      ctx,
@@ -343,12 +425,6 @@ func buildKeychain(ctx context.Context, registryHost, username, password, authHa
 			username: username,
 		})
 	}
-
-	// Priority 3: scafctl's own credential store.
-	keychains = append(keychains, &scafctlKeychain{})
-
-	// Priority 4: Docker/Podman config (~/.docker/config.json).
-	keychains = append(keychains, authn.DefaultKeychain)
 
 	return authn.NewMultiKeychain(keychains...)
 }

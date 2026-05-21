@@ -13,9 +13,12 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1938,4 +1941,142 @@ func TestRebase_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	_, err = remote.Get(imgRef)
 	assert.NoError(t, err)
+}
+
+// --- isUnsupported helper tests ---
+
+func TestIsUnsupported(t *testing.T) {
+	t.Run("transport error with UNSUPPORTED code", func(t *testing.T) {
+		err := &transport.Error{
+			Errors: []transport.Diagnostic{
+				{Code: transport.UnsupportedErrorCode, Message: "operation not supported"},
+			},
+			StatusCode: 405,
+		}
+		assert.True(t, isUnsupported(err))
+	})
+
+	t.Run("wrapped transport error with UNSUPPORTED code", func(t *testing.T) {
+		inner := &transport.Error{
+			Errors: []transport.Diagnostic{
+				{Code: transport.UnsupportedErrorCode, Message: "not supported"},
+			},
+			StatusCode: 405,
+		}
+		err := fmt.Errorf("delete failed: %w", inner)
+		assert.True(t, isUnsupported(err))
+	})
+
+	t.Run("transport error with different code", func(t *testing.T) {
+		err := &transport.Error{
+			Errors: []transport.Diagnostic{
+				{Code: transport.DeniedErrorCode, Message: "access denied"},
+			},
+			StatusCode: 403,
+		}
+		assert.False(t, isUnsupported(err))
+	})
+
+	t.Run("string fallback with UNSUPPORTED", func(t *testing.T) {
+		err := fmt.Errorf("UNSUPPORTED: operation not supported")
+		assert.True(t, isUnsupported(err))
+	})
+
+	t.Run("other error", func(t *testing.T) {
+		err := fmt.Errorf("INTERNAL: server error")
+		assert.False(t, isUnsupported(err))
+	})
+
+	t.Run("nil error", func(t *testing.T) {
+		assert.False(t, isUnsupported(nil))
+	})
+}
+
+// --- Config multi-arch tests ---
+
+func TestConfig_MultiArchIndex(t *testing.T) {
+	srv, p := setupRegistry(t)
+	
+	// Create and push a multi-arch index
+	ref := fmt.Sprintf("%s/myorg/app:multi", srv.Listener.Addr().String())
+	createAndPushMultiArchIndex(t, ref)
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpConfig,
+		"ref":       ref,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["config"])
+	assert.NotEmpty(t, data["digest"])
+	// Multi-arch index config should contain "manifests" array
+	assert.Contains(t, data["config"].(string), "manifests")
+}
+
+// --- Validate multi-arch tests ---
+
+func TestValidate_MultiArchIndex(t *testing.T) {
+	srv, p := setupRegistry(t)
+	
+	// Create and push a multi-arch index
+	ref := fmt.Sprintf("%s/myorg/app:multi", srv.Listener.Addr().String())
+	createAndPushMultiArchIndex(t, ref)
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpValidate,
+		"ref":       ref,
+	})
+	require.NoError(t, err)
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	// Multi-arch indexes don't have layers like images do
+	assert.Equal(t, 0, data["layerCount"])
+	assert.NotEmpty(t, data["digest"])
+}
+
+// createAndPushMultiArchIndex is a helper to create a multi-arch image index
+func createAndPushMultiArchIndex(t *testing.T, ref string) {
+	t.Helper()
+	
+	parsedRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+
+	// Create two random images for different platforms
+	img1, err := random.Image(256, 1)
+	require.NoError(t, err)
+	img2, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	// Create index with both images
+	idx := mutate.AppendManifests(
+		empty.Index,
+		mutate.IndexAddendum{
+			Add: img1,
+			Descriptor: v1.Descriptor{
+				MediaType: types.DockerManifestSchema2,
+				Platform: &v1.Platform{
+					OS:           "linux",
+					Architecture: "amd64",
+				},
+			},
+		},
+		mutate.IndexAddendum{
+			Add: img2,
+			Descriptor: v1.Descriptor{
+				MediaType: types.DockerManifestSchema2,
+				Platform: &v1.Platform{
+					OS:           "linux",
+					Architecture: "arm64",
+				},
+			},
+		},
+	)
+
+	err = remote.WriteIndex(parsedRef, idx)
+	require.NoError(t, err)
 }
