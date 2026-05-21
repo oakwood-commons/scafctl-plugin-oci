@@ -1,1086 +1,0 @@
-Script started on Tue May 19 06:44:46 2026
-[0m[49m[39m[27m[24m[K
-[1A7[0m[49m[39m]133;A[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[39m [0m[49m[39m]133;B[?2004h[?25l8[0m[49m[39m[27m[24m[J]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[27m[24m[1m[7m%[27m[1m[0m                                                                               [0m[49m[39m[27m[24m[K[0m[27m[24m[J[0m[30m[100m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[100m[34m[0m[34m[100m[100m[30m [0m[30m[100m[100m[30m first[0m[30m[100m[100m[30m [0m[30m[100m[49m[90m[0m[90m[49m[39m [0m[49m[39m[K[?1h=[?25h[?2004h[?25l[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?25h[7m bash /tmp/pr-[7mr[7mespond.sh 2>&1 | tail -5[27m[K[A[41C[27m [27mb[27ma[27ms[27mh[27m [27m/[27mt[27mm[27mp[27m/[27mp[27mr[27m-r[27me[27ms[27mp[27mo[27mn[27md[27m.[27ms[27mh[27m [27m2[27m>[27m&[27m1[27m [27m|[27m [27mt[27ma[27mi[27ml[27m [27m-[27m5[?1l>[?2004l
-]2;bash /tmp/pr-respond.sh 2>&1 | tail -5]1;bash bash /tmp/pr-respond.sh 2>&1 | grep -E '>>>|===|error|Error'
- bash /tmp/pr-respond.sh
- head -5 /tmp/pr-respond.sh && echo "---" && bash /tmp/pr-respond.sh 2>&1; echo "EXIT: $?"
- cat /tmp/pr-respond.sh | head -3
- wc -l /tmp/pr-respond.sh
- echo hello
- pwd
- exit
- bash /tmp/pr-respond.sh 2>&1 | tail -20
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8mM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CphQE"}}}}>>> Resolving PRRT_kwDOShI-U86C-8mM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8ml
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CphSZ"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ml
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  bash /tmp/pr- [Krrespond.sh 2>&1 | grep -E '>>>|===|error|Error'[?1l>[?2004l
-]2;bash /tmp/pr-respond.sh 2>&1 | grep --color=auto  -E '>>>|===|error|Error']1;bash[01;31m[K>>>[m[K Replying to PRRT_kwDOShI-U86C-4pv
-^C
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h[7m cat /tmp/pr-r[7me[7mspond.sh[27m[K[A[57C[27m [27mc[27ma[27mt[27m [27m/[27mt[27mm[27mp[27m/[27mp[27mr[27m-[27mre[27ms[27mp[27mo[27mn[27md[27m.[27ms[27mh[?1l>[?2004l
-]2;cat /tmp/pr-respond.sh]1;cat#!/bin/bash
-set -e
-
-reply_and_resolve() {
-  local thread_id="$1"
-  local body="$2"
-  
-  echo ">>> Replying to $thread_id"
-  gh api graphql \
-    -f query='mutation($id: ID!, $body: String!) { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $id, body: $body}) { comment { id } } }' \
-    -f id="$thread_id" \
-    -f body="$body"
-  
-  echo ">>> Resolving $thread_id"
-  gh api graphql \
-    -f query='mutation($threadId: ID!) { resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } } }' \
-    -f threadId="$thread_id"
-}
-
-reply_and_resolve "PRRT_kwDOShI-U86C-4pv" \
-  "Fixed -- default GHCR scope now includes read:packages,write:packages so write operations work out of the box with host-broker auth. Thanks!"
-
-reply_and_resolve "PRRT_kwDOShI-U86C-4pz" \
-  "Fixed -- executePull now parses the platform input and passes remote.WithPlatform when resolving the descriptor."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8ge" \
-  "Fixed -- narrowed the schema description to Docker-style image tarball since that is what the implementation supports."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8gu" \
-  "Fixed in the same change as the other platform thread -- executePull now honors platform."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8g2" \
-  "Fixed -- ConfigureProvider now validates the provider name and returns unknown provider for misrouted calls."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8hB" \
-  "Fixed -- ExecuteProviderStream now checks the provider name before returning streaming-not-supported."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8hR" \
-  "Fixed -- added src, dst, and path to the Action output schema."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8he" \
-  "Fixed -- ExtractDependencies now validates the provider name."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8hr" \
-  "Fixed -- StopProvider now validates the provider name."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8hz" \
-  "Fixed -- applyConfigMutations now returns an error for malformed config entries (e.g., wrong type for env, cmd, entrypoint)."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8iC" \
-  "Fixed -- changed outputDir to path with an expression that builds the tarball path. Also switched simple resolver refs to rslvr: syntax."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8iM" \
-  "Fixed -- changed tarPath to path."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8iU" \
-  "Fixed -- changed ref/target to src/dst."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8il" \
-  "Fixed -- moved labels under config and removed unsupported annotations field."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8ix" \
-  "Fixed -- replaced bash backslash with PowerShell backtick continuations."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8i6" \
-  "Fixed -- benchmark setup now uses require.NoError(b, ...) for all fallible calls."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8jH" \
-  "Updated the test comment to clarify it validates client-side keychain wiring, not registry-side access control. The test registry package does not support auth enforcement, so this is the correct scope for a unit test."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8jP" \
-  "Fixed -- benchmark loop now checks the error with require.NoError(b, err)."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8jd" \
-  "Fixed -- added the missing NOTICE condition (section 4d) and expanded the abbreviated warranty/liability/additional-liability sections to the canonical Apache-2.0 text."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8jl" \
-  "Fixed -- replaced @OWNER with @oakwood-commons/platform."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8jw" \
-  "Fixed -- updated clone URL to github.com/oakwood-commons/scafctl-plugin-oci."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8kA" \
-  "Fixed -- updated the security advisory link to point to this repository."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8kW" \
-  "Fixed -- updated the template name to scafctl-plugin-oci."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8kj" \
-  "Fixed -- updated the title to scafctl-plugin-oci."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8ku" \
-  "Fixed -- updated the path to ./examples/pull-push.yaml."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8ky" \
-  "Good catch -- updated to say wait for user approval to match the companion agent instructions."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8k7" \
-  "Fixed -- added windows/arm64 extraction and catalog platform entry to the release workflow."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8lH" \
-  "Fixed -- updated the guidance to say outputs go directly in sdkprovider.Output.Data rather than nested under data/result."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8lM" \
-  "Fixed -- scafctlConfigPath now handles the error from os.UserHomeDir() and returns empty string, which callers check."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8lV" \
-  "Fixed -- scafctlAuthFilePaths now returns nil when os.UserHomeDir() fails."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8lh" \
-  "Fixed -- writeTarDir now skips non-regular files (FIFOs, device nodes, sockets) after the directory check."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8lm" \
-  "Fixed -- renamed to TestMissingInputValidation."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8l0" \
-  "Fixed -- version is now a package-level var settable via -ldflags. GoReleaser already has ldflags configured."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8mM" \
-  "Fixed -- updated prerequisite to Go 1.26.2+ to match go.mod."
-
-reply_and_resolve "PRRT_kwDOShI-U86C-8ml" \
-  "Added lifecycle method tests (TestLifecycleMethods_UnknownProvider) and invalid config type test. The host-broker path requires a mock HostClient in context which is beyond the scope of this PR -- tracked for follow-up."
-
-echo "=== All 35 threads responded and resolved ==="
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h[7m bash /tmp/pr-[7mr[7mespond.sh 2>&1[27m[K[A[51C[27m [27mb[27ma[27ms[27mh[27m [27m/[27mt[27mm[27mp[27m/[27mp[27mr[27m-r[27me[27ms[27mp[27mo[27mn[27md[27m.[27ms[27mh[27m [27m2[27m>[27m&[27m1[?1l>[?2004l
-]2;bash /tmp/pr-respond.sh 2>&1]1;bash>>> Replying to PRRT_kwDOShI-U86C-4pv
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CphiT"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-4pv
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-4pz
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CphlX"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-4pz
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8ge
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpho8"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8ge
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8gu
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cphrb"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8gu
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8g2
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CphuI"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8g2
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8hB
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cphwy"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8hB
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8hR
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cphz6"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8hR
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8he
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cph2p"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8he
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8hr
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cph5E"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8hr
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8hz
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cph8V"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8hz
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8iC
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cph_F"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8iC
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8iM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiCT"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8iM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8iU
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiFL"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8iU
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8il
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiHv"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8il
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8ix
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiLI"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8ix
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8i6
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiNm"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8i6
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8jH
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiQW"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8jH
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8jP
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiUB"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8jP
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8jd
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiYO"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8jd
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8jl
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpibg"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8jl
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8jw
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpiel"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8jw
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8kA
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpiiC"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8kA
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8kW
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpilB"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8kW
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8kj
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpioF"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8kj
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8ku
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpir9"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8ku
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8ky
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpiwg"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8ky
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8k7
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpizZ"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8k7
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8lH
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpi2_"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8lH
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8lM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpi7s"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8lM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8lV
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87Cpi-z"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8lV
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8lh
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpjDh"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8lh
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8lm
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpjIE"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8lm
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8l0
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpjMR"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8l0
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8mM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpjP0"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8mM
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Replying to PRRT_kwDOShI-U86C-8ml
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"addPullRequestReviewThreadReply"[m[1;38m:[m [1;38m{[m
-      [1;34m"comment"[m[1;38m:[m [1;38m{[m
-        [1;34m"id"[m[1;38m:[m [32m"PRRC_kwDOShI-U87CpjS3"[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
->>> Resolving PRRT_kwDOShI-U86C-8ml
-]11;?\[6n]11;?\[6n[1;38m{[m
-  [1;34m"data"[m[1;38m:[m [1;38m{[m
-    [1;34m"resolveReviewThread"[m[1;38m:[m [1;38m{[m
-      [1;34m"thread"[m[1;38m:[m [1;38m{[m
-        [1;34m"isResolved"[m[1;38m:[m [33mtrue[m
-      [1;38m}[m
-    [1;38m}[m
-  [1;38m}[m
-[1;38m}[m
-=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h[7m bash /tmp/pr-[7mr[7mespond.sh 2>&1 | tail -20[27m[K[A[40C[27m [27mb[27ma[27ms[27mh[27m [27m/[27mt[27mm[27mp[27m/[27mp[27mr[27m-r[27me[27ms[27mp[27mo[27mn[27md[27m.[27ms[27mh[27m [27m2[27m>[27m&[27m1[27m [27m|[27m [27mt[27ma[27mi[27ml[27m [27m-[27m2[27m0[?1l>[?2004l
-]2;bash /tmp/pr-respond.sh 2>&1 | tail -20]1;bash bash /tmp/pr-respond.sh > /tmp/pr-respond-out.txt 2>&1; echo "EXIT CODE: $?"; tail -20 /tmp/pr-respond-out.txt
- echo "test123"
- cat /tmp/pr-respond-out.txt | wc -l && tail -20 /tmp/pr-respond-out.txt
- ls -la /tmp/pr-respond-out.txt 2>&1; echo "---"; wc -l /tmp/pr-respond-out.txt 2>&1; echo "---"; tail -20 /tmp/pr-respond-out.txt 2>&1
- head -5 "/Users/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe7c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3-a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/content.txt"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplDM"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ky
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8k7
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplHg"}}}}>>> Resolving PRRT_kwDOShI-U86C-8k7
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lH
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplKi"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lH
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplNn"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lV
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplRC"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lV
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lh
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplUG"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lh
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lm
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplYk"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lm
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8l0
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CplcG"}}}}>>> Resolving PRRT_kwDOShI-U86C-8l0
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8mM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpleo"}}}}>>> Resolving PRRT_kwDOShI-U86C-8mM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8ml
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpliF"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ml
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  bash /tmp/pr- [Krrespond.sh > /tmp/pr-respond-out.txt 2>&1; echo "EXIT CODE: $?"; tail -20 /tmp/p [Krr-respond-out.txt[?1l>[?2004l
- echo "test123"
- cat /tmp/pr-respond-out.txt | wc -l && tail -20 /tmp/pr-respond-out.txt
- ls -la /tmp/pr-respond-out.txt 2>&1; echo "---"; wc -l /tmp/pr-respond-out.txt 2>&1; echo "---"; tail -20 /tmp/pr-respond-out.txt 2>&1
- head -5 "/Users/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe7c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3-a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/content.txt"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d]2;bash /tmp/pr-respond.sh > /tmp/pr-respond-out.txt 2>&1; echo "EXIT CODE: $?";]1;bashEXIT CODE: 0
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnN8"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ky
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8k7
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnR_"}}}}>>> Resolving PRRT_kwDOShI-U86C-8k7
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lH
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnWX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lH
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnaX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lV
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnd5"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lV
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lh
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnhG"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lh
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lm
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnkf"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lm
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8l0
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnon"}}}}>>> Resolving PRRT_kwDOShI-U86C-8l0
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8mM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnsm"}}}}>>> Resolving PRRT_kwDOShI-U86C-8mM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8ml
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnvl"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ml
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  echo "test123 [K"[?1l>[?2004l
- cat /tmp/pr-respond-out.txt | wc -l && tail -20 /tmp/pr-respond-out.txt
- ls -la /tmp/pr-respond-out.txt 2>&1; echo "---"; wc -l /tmp/pr-respond-out.txt 2>&1; echo "---"; tail -20 /tmp/pr-respond-out.txt 2>&1
- head -5 "/Users/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe7c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3-a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/content.txt"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  ]2;echo "test123"]1;echotest123
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  cat /tmp/pr-r [Keespond-out.txt | wc -l && tail -20 /tmp/pr-respond-out.txt[?1l>[?2004l
- ls -la /tmp/pr-respond-out.txt 2>&1; echo "---"; wc -l /tmp/pr-respond-out.txt 2>&1; echo "---"; tail -20 /tmp/pr-respond-out.txt 2>&1
- head -5 "/Users/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe7c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3-a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/content.txt"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F ]2;cat /tmp/pr-respond-out.txt | wc -l && tail -20 /tmp/pr-respond-out.txt]1;cat71
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnN8"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ky
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8k7
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnR_"}}}}>>> Resolving PRRT_kwDOShI-U86C-8k7
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lH
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnWX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lH
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnaX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lV
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnd5"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lV
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lh
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnhG"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lh
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lm
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnkf"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lm
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8l0
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnon"}}}}>>> Resolving PRRT_kwDOShI-U86C-8l0
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8mM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnsm"}}}}>>> Resolving PRRT_kwDOShI-U86C-8mM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8ml
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnvl"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ml
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  ls -la /tmp/p [Krr-respond-out.txt 2>&1; echo "---"; wc -l /tmp/pr-respond-out.txt 2>&1; echo "-- [K--"; tail -20 /tmp/pr-respond-out.txt 2>&1[?1l>[?2004l
- head -5 "/Users/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe7c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3-a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/content.txt"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | pythh   }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwoo]2;ls -G -la /tmp/pr-respond-out.txt 2>&1; echo "---"; wc -l  2>&1; echo "---"; ]1;ls-rw-r--r-- 1 abaker9 7886 May 19 06:51 /tmp/pr-respond-out.txt
----
-71 /tmp/pr-respond-out.txt
----
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnN8"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ky
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8k7
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnR_"}}}}>>> Resolving PRRT_kwDOShI-U86C-8k7
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lH
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnWX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lH
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnaX"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lV
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnd5"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lV
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lh
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87CpnhG"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lh
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8lm
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnkf"}}}}>>> Resolving PRRT_kwDOShI-U86C-8lm
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8l0
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnon"}}}}>>> Resolving PRRT_kwDOShI-U86C-8l0
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8mM
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnsm"}}}}>>> Resolving PRRT_kwDOShI-U86C-8mM
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}>>> Replying to PRRT_kwDOShI-U86C-8ml
-{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_kwDOShI-U87Cpnvl"}}}}>>> Resolving PRRT_kwDOShI-U86C-8ml
-{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}=== All 35 threads responded and resolved ===
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  head -5 "/Use [Krrs/abaker9/Library/Application Support/Code/User/workspaceStorage/9dc991e587a7fe [K77c3a3f6ec1aac06968/GitHub.copilot-chat/chat-session-resources/b7fd0abc-aa8d-42e3 [K--a5cc-ea5a92e5f30c/toolu_vrtx_0122aobCNNtqxLu7KVSysdZj__vscode-1779186325105/con [Kttent.txt"[?1l>[?2004l
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='
-  query($owner: String!, $repo: String!, $pr: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $pr) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-          }
-        }
-      }
-    }
-  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | pythh   }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons  $  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood]2;head -5 ]1;head>>> Replying to PRRT_kwDOShI-U86C-4pv
-{
-  "data": {
-    "addPullRequestReviewThreadReply": {
-      "comment": {
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  cd /Users/aba [Kkker9/Public/scafctl-plugin-oci && gh api graphql -f query='[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h   query($owner: String!, $repo: String!, $pr: Int!) {[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h     repository(owner: $owner, name: $repo) {[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h       pullRequest(number: $pr) {[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h         reviewThreads(first: 100) {[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h           nodes {[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h             isResolved[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h           }[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h         }[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h       }[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h     }[?1l>[?2004l
-[0m[27m[24m[Jcmdand quote> [K[?1h=[?2004h   }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | [K  python3 -c "import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scaf [Kcctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  }' - i  }' -f ow [Knner=['  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | pythh   [K  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "im [Kpport sys,json; d=json.l  }' -f owner=oakwood-commons  $  }' -f owner=oakwood-com [Kmmons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "import sys,json; d=json.l  [K  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c "im [Kpport sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood-commons lve [Kdd=sum(1 for t in threads if t['isResolved']); unresolved=sum(1 for t in threads  [Kiif not t['isResolved']); print(f'Total: {len(threads)}, Resolved: {resolved}, Un [Krresolved: {unresolved}')"[?1l>[?2004l
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes { isResolved } } } } }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 2>&1 | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-threads=d['data']['repository']['pullRequest']['reviewThreads']['nodes']
-resolved=sum(1 for t in threads if t['isResolved'])
-unresolved=sum(1 for t in threads if not t['isResolved'])
-print(f'Total: {len(threads)}, Resolved: {resolved}, Unresolved: {unresolved}')
-"
- cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThr cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f query='query($owner: String!, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequest(n]2;cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f  -f  -f  -F ]1;cd  File "<string>", line 1
-    import sys,json; d=json.l  }' -f owner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 | python3 -c import
-                               ^
-SyntaxError: unmatched '}'
-zsh: bad pattern: owner=[  }
-zsh: command not found: pythh
-  File "<string>", line 1
-    import sys,json; d=json.l  }' - i  }' -f owner=['  }' -f owner=oakwood-commons lved=sum(1 for t in threads if t['isResolved']); unresolved=sum(1 for t in threads if not t['isResolved']); print(f'Total: {len(threads)}, Resolved: {resolved}, Unresolved: {unresolved}')
-                               ^
-SyntaxError: unmatched '}'
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  cd /Users/aba [Kkker9/Public/scafctl-plugin-oci && gh api graphql -f query='query($owner: String! [K,, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequ [Keest(number: $pr) { reviewThreads(first: 100) { nodes { isResolved } } } } }' -f  [Koowner=oakwood-commons -f repo=scafctl-plugin-oci -F pr=1 2>&1 | python3 -c "[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004hiimport sys,json[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004hdd=json.load(sys.stdin)[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004htthreads=d['data']['repository']['pullRequest']['reviewThread [Kss']['nodes'][?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004hrresolved=sum(1 for t in threads if t['isResolved'])[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004huunresolved=sum(1 for t in threads if not t['isResolved'])[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004hpprint(f'Total: {len(threads)}, Resolved: {resolved}, Unresol [Kvved: {unresolved}')[?1l>[?2004l
-[0m[27m[24m[Jcmdand pipe dquote> [K[?1h=[?2004h"[?1l>[?2004l
-]2;cd /Users/abaker9/Public/scafctl-plugin-oci && gh api graphql -f  -f  -f  -F ]1;cdTotal: 35, Resolved: 35, Unresolved: 0
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h  cd /Users/aba [Kkker9/Public/scafctl-plugin-oci && gh api graphql -f query='query($owner: String! [K,, $repo: String!, $pr: Int!) { repository(owner: $owner, name: $repo) { pullRequ [Keest(number: $pr) { reviewThr cd /Users/abaker9/Public/scafctl-plugin-oci && gh a [Kppi graphql -f query='query($owner: String!, $repo: String!, $pr: Int!) { reposit [Koory(owner: $owner, name: $repo) { pullRequest(number:hreads.json') as f:[?1l>[?2004l
-zsh: event not found: ,
-[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004h     d=json.loa [Kdd(f)[?1l>[?2004l
-]2;d=json.load(f) ]1;[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m[30m [0m[30m[49m[30m first[0m[30m[49m[30m[0m[30m[49m[30m ●[0m[30m[49m[30m ?[0m[30m[49m[30m [0m[30m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[?1h=[?2004htthreads=d['dat [Kaa']['repository']['pullRequest']['reviewThreads']['nodes'][?1l>[?2004l
-]2;threads=d['data']['repository']['pullRequest']['reviewThreads']['nodes'] ]1;[1m[7m%[27m[1m[0m                                                                                ]2;abaker9@KT4TX41006:~/Public/scafctl-plugin-oci]1;..tl-plugin-oci]7;file://KT4TX41006/Users/abaker9/Public/scafctl-plugin-oci\[0m[49m[39m[K
-[0m[27m[24m[J[0m[30m[49m[39m[0m[40m[33m abaker9@KT4TX41006[0m[33m[40m[40m[33m [0m[33m[40m[44m[30m[0m[30m[44m[44m[30m ~/Public/scafctl-plugin-oci[0m[30m[44m[44m[30m [0m[30m[44m[49m[34m[0m[34m[49m
