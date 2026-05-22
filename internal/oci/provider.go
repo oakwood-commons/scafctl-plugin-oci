@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -102,6 +103,10 @@ func (p *Plugin) GetProviderDescriptor(_ context.Context, providerName string) (
 		Capabilities: []sdkprovider.Capability{
 			sdkprovider.CapabilityFrom,
 			sdkprovider.CapabilityAction,
+		},
+		WriteOperations: []string{
+			OpPull, OpPush, OpCopy, OpAppend, OpMutate,
+			OpTag, OpIndex, OpExport, OpFlatten, OpRebase, OpDelete,
 		},
 		Schema:        buildInputSchema(),
 		OutputSchemas: buildOutputSchemas(),
@@ -202,17 +207,34 @@ func (p *Plugin) DescribeWhatIf(_ context.Context, providerName string, input ma
 		return fmt.Sprintf("Would copy %s to %s", src, dst), nil
 	case OpAppend:
 		msg := fmt.Sprintf("Would append layer(s) to %s", ref)
-		if dst != "" && dst != ref {
+		output, _ := input["output"].(string)
+		if output != "" {
+			msg += fmt.Sprintf(" → %s", output)
+		} else if dst != "" && dst != ref {
 			msg = fmt.Sprintf("Would append layer(s) to %s → %s", ref, dst)
+		}
+		if lr, _ := input["layer_root"].(string); lr != "" {
+			msg += fmt.Sprintf(" (layer_root: %s)", lr)
 		}
 		return msg, nil
 	case OpMutate:
+		// Catch common mistake: using "tag" (which is for the tag operation) instead of "dst".
+		if tag, hasTag := input["tag"]; hasTag {
+			if tagStr, _ := tag.(string); tagStr != "" {
+				if _, hasDst := input["dst"]; !hasDst {
+					return "ERROR: mutate does not use \"tag\" to set the destination; use \"dst\" instead", nil
+				}
+			}
+		}
 		parts := []string{"Would mutate"}
 		if n := countLayers(input); n > 0 {
 			parts = append(parts, fmt.Sprintf("(append %d layer(s))", n))
 		}
 		parts = append(parts, ref)
-		if dst != "" && dst != ref {
+		output, _ := input["output"].(string)
+		if output != "" {
+			parts = append(parts, "→", output)
+		} else if dst != "" && dst != ref {
 			parts = append(parts, "→", dst)
 		}
 		return strings.Join(parts, " "), nil
@@ -794,9 +816,16 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("at least one layer path is required")
 	}
 
-	dstStr, dstRef, err := p.resolveDestination(ref, input)
-	if err != nil {
-		return nil, err
+	// Validate destination early to fail fast before any remote I/O or layer work.
+	outputPath, _ := input["output"].(string)
+	var dstStr string
+	var dstRef name.Reference
+	if outputPath == "" {
+		var dstErr error
+		dstStr, dstRef, dstErr = p.resolveDestination(ref, input)
+		if dstErr != nil {
+			return nil, dstErr
+		}
 	}
 
 	img, err := p.resolveBaseImage(ctx, input, ref)
@@ -804,9 +833,12 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, err
 	}
 
+	layerRoot, _ := input["layer_root"].(string)
+	layerRoot = sanitizeLayerRoot(layerRoot)
+
 	var layers []v1.Layer
 	for _, lp := range layerPaths {
-		layer, layerErr := layerFromPath(lp)
+		layer, layerErr := layerFromPath(lp, layerRoot)
 		if layerErr != nil {
 			return nil, fmt.Errorf("creating layer from %q: %w", lp, layerErr)
 		}
@@ -818,6 +850,11 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("appending layers: %w", err)
 	}
 
+	// If output path is set, write to tarball instead of pushing to registry.
+	if outputPath != "" {
+		return p.writeOutputTarball(newImg, ref, outputPath)
+	}
+
 	if err := remote.Write(dstRef, newImg, p.remoteOptions(ctx)...); err != nil {
 		return nil, fmt.Errorf("pushing appended image to %q: %w", dstStr, err)
 	}
@@ -827,9 +864,9 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("getting new digest: %w", err)
 	}
 
-	newSize, err := newImg.Size()
+	totalSize, err := totalImageSize(newImg)
 	if err != nil {
-		return nil, fmt.Errorf("getting new size: %w", err)
+		return nil, fmt.Errorf("getting image size: %w", err)
 	}
 
 	return &sdkprovider.Output{
@@ -837,7 +874,7 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 			"success": true,
 			"ref":     dstStr,
 			"digest":  newDigest.String(),
-			"size":    newSize,
+			"size":    totalSize,
 		},
 	}, nil
 }
@@ -848,6 +885,15 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 	ref, err := requireString(input, "ref")
 	if err != nil {
 		return nil, err
+	}
+
+	// Catch common mistake: using "tag" (which is for the tag operation) instead of "dst".
+	if tag, hasTag := input["tag"]; hasTag {
+		if tagStr, _ := tag.(string); tagStr != "" {
+			if _, hasDst := input["dst"]; !hasDst {
+				return nil, fmt.Errorf("mutate does not use \"tag\" to set the destination; use \"dst\" instead")
+			}
+		}
 	}
 
 	img, err := p.resolveBaseImage(ctx, input, ref)
@@ -865,9 +911,11 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 		}
 	}
 	if len(layerPaths) > 0 {
+		layerRoot, _ := input["layer_root"].(string)
+		layerRoot = sanitizeLayerRoot(layerRoot)
 		var layers []v1.Layer
 		for _, lp := range layerPaths {
-			layer, layerErr := layerFromPath(lp)
+			layer, layerErr := layerFromPath(lp, layerRoot)
 			if layerErr != nil {
 				return nil, fmt.Errorf("creating layer from %q: %w", lp, layerErr)
 			}
@@ -932,9 +980,9 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 		return nil, fmt.Errorf("getting new digest: %w", err)
 	}
 
-	newSize, err := img.Size()
+	totalSize, err := totalImageSize(img)
 	if err != nil {
-		return nil, fmt.Errorf("getting new size: %w", err)
+		return nil, fmt.Errorf("getting image size: %w", err)
 	}
 
 	return &sdkprovider.Output{
@@ -942,20 +990,16 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 			"success": true,
 			"ref":     dstStr,
 			"digest":  newDigest.String(),
-			"size":    newSize,
+			"size":    totalSize,
 		},
 	}, nil
 }
 
 // applyAnnotations applies OCI manifest-level annotations to an image.
 func applyAnnotations(img v1.Image, rawAnns any) (v1.Image, error) {
-	anns, ok := rawAnns.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("field \"annotations\": expected object, got %T", rawAnns)
-	}
-	annMap := make(map[string]string, len(anns))
-	for k, v := range anns {
-		annMap[k] = fmt.Sprintf("%v", v)
+	annMap, err := coerceStringMap(rawAnns)
+	if err != nil {
+		return nil, fmt.Errorf("field \"annotations\": %w", err)
 	}
 	annotated := mutate.Annotations(img, annMap)
 	annotatedImg, ok := annotated.(v1.Image)
@@ -982,10 +1026,10 @@ func (p *Plugin) writeOutputTarball(img v1.Image, ref, outputPath string) (*sdkp
 	}
 
 	if err := tarball.WriteToFile(filepath.Clean(outputPath), tagRef, img); err != nil {
-		return nil, fmt.Errorf("writing mutated image to %q: %w", outputPath, err)
+		return nil, fmt.Errorf("writing image to %q: %w", outputPath, err)
 	}
 
-	newSize, err := img.Size()
+	newSize, err := totalImageSize(img)
 	if err != nil {
 		return nil, fmt.Errorf("getting size: %w", err)
 	}
@@ -1647,9 +1691,11 @@ func getStringSlice(input map[string]any, field string) ([]string, error) {
 	}
 }
 
-// layerFromPath creates a layer from a file path (tar.gz or directory).
+// layerFromPath creates a layer from a file path (tar.gz, directory, or raw file).
 // For directories, the tar is built lazily via an opener to avoid goroutine leaks.
-func layerFromPath(path string) (v1.Layer, error) {
+// When layerRoot is non-empty, files are placed under that prefix inside the container.
+// Raw (non-tar) files are wrapped in a single-entry tar layer.
+func layerFromPath(path, layerRoot string) (v1.Layer, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolving path %q: %w", path, err)
@@ -1664,15 +1710,42 @@ func layerFromPath(path string) (v1.Layer, error) {
 		opener := func() (io.ReadCloser, error) {
 			pr, pw := io.Pipe()
 			go func() {
-				pw.CloseWithError(writeTarDir(pw, absPath))
+				pw.CloseWithError(writeTarDir(pw, absPath, layerRoot))
 			}()
 			return pr, nil
 		}
 		return tarball.LayerFromOpener(opener)
 	}
 
-	// Assume tarball file.
-	return tarball.LayerFromFile(absPath)
+	// Check if it's a tar or tar.gz file.
+	if isTarFile(absPath) {
+		if layerRoot != "" {
+			// Rewrite paths inside the tar with the prefix.
+			opener := func() (io.ReadCloser, error) {
+				pr, pw := io.Pipe()
+				go func() {
+					pw.CloseWithError(rewriteTarPrefix(pw, absPath, layerRoot))
+				}()
+				return pr, nil
+			}
+			return tarball.LayerFromOpener(opener)
+		}
+		return tarball.LayerFromFile(absPath)
+	}
+
+	// Raw file — wrap in a single-entry tar layer.
+	destName := filepath.Base(absPath)
+	if layerRoot != "" {
+		destName = filepath.ToSlash(filepath.Join(layerRoot, destName))
+	}
+	opener := func() (io.ReadCloser, error) {
+		pr, pw := io.Pipe()
+		go func() {
+			pw.CloseWithError(writeSingleFileTar(pw, absPath, destName, fi))
+		}()
+		return pr, nil
+	}
+	return tarball.LayerFromOpener(opener)
 }
 
 // mergeConvenienceConfig builds a config map from top-level convenience inputs
@@ -1732,12 +1805,16 @@ func applyConfigMutations(cfgFile *v1.ConfigFile, cfg map[string]any) error {
 	if workdir, ok := cfg["workdir"].(string); ok && workdir != "" {
 		cfgFile.Config.WorkingDir = workdir
 	}
-	if labels, ok := cfg["labels"].(map[string]any); ok {
+	if v, exists := cfg["labels"]; exists {
+		labels, err := coerceStringMap(v)
+		if err != nil {
+			return fmt.Errorf("field \"labels\": %w", err)
+		}
 		if cfgFile.Config.Labels == nil {
 			cfgFile.Config.Labels = make(map[string]string)
 		}
 		for k, v := range labels {
-			cfgFile.Config.Labels[k] = fmt.Sprintf("%v", v)
+			cfgFile.Config.Labels[k] = v
 		}
 	}
 	if v, exists := cfg["exposed_ports"]; exists {
@@ -1801,8 +1878,24 @@ func coerceStringOrSlice(v any) ([]string, bool) {
 }
 
 // coerceEnv normalizes env values to []string{"KEY=VALUE", ...}.
-// Accepts []string, []any (of strings), or map[string]any.
+// Accepts []string, []any (of strings), map[string]any, or a single
+// comma-separated string (for CLI convenience, e.g. "KEY1=val1,KEY2=val2").
 func coerceEnv(v any) ([]string, error) {
+	if s, ok := v.(string); ok {
+		parts := strings.Split(s, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if !strings.Contains(p, "=") {
+				return nil, fmt.Errorf("env entry %q must be in KEY=VALUE format", p)
+			}
+			result = append(result, p)
+		}
+		return result, nil
+	}
 	if m, ok := v.(map[string]any); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1820,6 +1913,45 @@ func coerceEnv(v any) ([]string, error) {
 		return nil, fmt.Errorf("expected array of strings or map of key-value pairs")
 	}
 	return env, nil
+}
+
+// sanitizeLayerRoot normalizes a layer_root value to a clean, relative path
+// that cannot escape the intended prefix via traversal segments.
+func sanitizeLayerRoot(root string) string {
+	cleaned := path.Clean(strings.TrimLeft(root, "/"))
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return ""
+	}
+	return cleaned
+}
+
+// coerceStringMap normalizes a value to map[string]string.
+// Accepts map[string]any or a comma-separated string of key=value pairs (for CLI use).
+func coerceStringMap(v any) (map[string]string, error) {
+	switch val := v.(type) {
+	case map[string]any:
+		m := make(map[string]string, len(val))
+		for k, v := range val {
+			m[k] = fmt.Sprintf("%v", v)
+		}
+		return m, nil
+	case string:
+		m := make(map[string]string)
+		for _, part := range strings.Split(val, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			k, v, ok := strings.Cut(part, "=")
+			if !ok {
+				return nil, fmt.Errorf("entry %q must be in key=value format", part)
+			}
+			m[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+		return m, nil
+	default:
+		return nil, fmt.Errorf("expected object or comma-separated key=value string, got %T", v)
+	}
 }
 
 // countLayers returns the number of layers in the input, handling both []any and []string.
@@ -1854,12 +1986,24 @@ func stringOrArraySchema(description string) *jsonschema.Schema {
 	}
 }
 
-// stringArrayOrMapSchema returns a JSON Schema that accepts either an array of strings or an object map.
+// stringArrayOrMapSchema returns a JSON Schema that accepts a string, an array of strings, or an object map.
 func stringArrayOrMapSchema(description string) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Description: description,
 		OneOf: []*jsonschema.Schema{
+			sdkhelper.StringProp("comma-separated KEY=value pairs"),
 			sdkhelper.ArrayProp("array of VAR=value strings", sdkhelper.WithItems(sdkhelper.StringProp("VAR=value"))),
+			sdkhelper.ObjectProp("map of key-value pairs", nil, nil),
+		},
+	}
+}
+
+// stringOrMapSchema returns a JSON Schema that accepts a comma-separated string or an object map.
+func stringOrMapSchema(description string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: description,
+		OneOf: []*jsonschema.Schema{
+			sdkhelper.StringProp("comma-separated key=value pairs"),
 			sdkhelper.ObjectProp("map of key-value pairs", nil, nil),
 		},
 	}
@@ -1886,7 +2030,7 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("ghcr.io/myorg/myapp:v1"),
 			),
 			"dst": sdkhelper.StringProp(
-				"Destination image reference for copy and mutate operations",
+				"Destination image reference to push the result to (copy, mutate, append, flatten, rebase). Defaults to ref if omitted. Required when ref is \"scratch\". Ignored when output is set (local tarball)",
 				sdkhelper.WithExample("ecr.io/myorg/myapp:v1"),
 			),
 			"repository": sdkhelper.StringProp(
@@ -1906,8 +2050,13 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("linux/amd64"),
 			),
 			"layers": sdkhelper.ArrayProp(
-				"Layer paths to append (files or directories); supported in append and mutate operations",
+				"Layer paths to append (files, directories, or tarballs); supported in append and mutate operations",
 				sdkhelper.WithItems(sdkhelper.StringProp("Layer file path")),
+			),
+			"layer_root": sdkhelper.StringProp(
+				"Destination prefix path for appended layers inside the container (e.g., /usr/local/bin). "+
+					"Raw files and directories are placed under this path",
+				sdkhelper.WithExample("/home/default"),
 			),
 			"manifests": sdkhelper.ArrayProp(
 				"List of per-platform images for the index operation",
@@ -1945,22 +2094,20 @@ func buildInputSchema() *jsonschema.Schema {
 				"Working directory (convenience; overrides config.workdir)",
 			),
 			"env": stringArrayOrMapSchema(
-				"Environment variables (convenience; overrides config.env). Accepts array of VAR=value strings or a map of key-value pairs",
+				"Environment variables (convenience; overrides config.env). Accepts array of VAR=value strings, a map, or a comma-separated string. Values containing literal commas must use array or map form",
 			),
-			"labels": sdkhelper.ObjectProp(
-				"Image labels (convenience; overrides config.labels)",
-				nil, nil,
+			"labels": stringOrMapSchema(
+				"Image labels (convenience; overrides config.labels). Accepts a map or comma-separated key=value string",
 			),
-			"annotations": sdkhelper.ObjectProp(
-				"OCI annotations (manifest-level metadata, distinct from Docker labels). Used with mutate operation",
-				nil, nil,
+			"annotations": stringOrMapSchema(
+				"OCI annotations (manifest-level metadata, distinct from Docker labels). Accepts a map or comma-separated key=value string",
 			),
 			"tag": sdkhelper.StringProp(
-				"New tag to apply to an image (tag operation)",
+				"New tag name for the tag operation only (retags an existing image). To set the push destination for mutate/append, use dst instead",
 				sdkhelper.WithExample("latest"),
 			),
 			"output": sdkhelper.StringProp(
-				"Write result to local tarball instead of pushing (mutate operation)",
+				"Write result to local tarball instead of pushing (append and mutate operations)",
 				sdkhelper.WithExample("./mutated.tar"),
 			),
 			"exposed_ports": sdkhelper.ArrayProp(

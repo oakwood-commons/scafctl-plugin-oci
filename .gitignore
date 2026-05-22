@@ -10,6 +10,7 @@
 # Coverage
 coverage.*
 *.coverprofile
+cover
 
 # Go workspace
 go.work

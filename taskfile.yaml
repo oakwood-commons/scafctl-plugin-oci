@@ -2,9 +2,11 @@ version: "3"
 
 vars:
   BINARY: scafctl-plugin-oci
+  CLI: '{{default "cldctl" .CLI}}'
   DIST: "{{.ROOT_DIR | toSlash}}/dist"
   COVER: "{{.ROOT_DIR | toSlash}}/cover"
   VERSION: '{{default "" .VERSION}}'
+  EXE: '{{if eq OS "windows"}}.exe{{end}}'
 
 tasks:
   default:
@@ -20,24 +22,24 @@ tasks:
       - go.mod
       - go.sum
     generates:
-      - "{{.DIST}}/{{.BINARY}}"
+      - "{{.DIST}}/{{.BINARY}}{{.EXE}}"
     cmds:
       - mkdir -p {{.DIST}}
       - >-
         go build -ldflags "-s -w{{if .VERSION}} -X github.com/oakwood-commons/scafctl-plugin-oci/internal/oci.version={{.VERSION}}{{end}}"
-        -o {{.DIST}}/{{.BINARY}}
+        -o {{.DIST}}/{{.BINARY}}{{.EXE}}
         ./cmd/{{.BINARY}}/
 
   publish:local:
-    desc: Build and install the plugin into the local scafctl catalog
+    desc: Build and install the plugin into the local catalog
     deps: [build]
     cmds:
       - >-
-        scafctl build plugin --force
+        {{.CLI}} build plugin --force
         --name oci
         --kind provider
         --version {{default "0.1.0" .VERSION}}
-        --platform {{OS}}/{{ARCH}}={{.DIST}}/{{.BINARY}}
+        --platform {{OS}}/{{ARCH}}={{.DIST}}/{{.BINARY}}{{.EXE}}
 
   release:tag:
     desc: "Create and push a signed release tag (usage: task release:tag VERSION=0.1.1)"
@@ -54,11 +56,11 @@ tasks:
     deps: [build]
     cmds:
       - >-
-        scafctl build plugin --force
+        {{.CLI}} build plugin --force
         --name oci
         --kind provider
         --version {{.VERSION}}
-        --platform {{OS}}/{{ARCH}}={{.DIST}}/{{.BINARY}}
+        --platform {{OS}}/{{ARCH}}={{.DIST}}/{{.BINARY}}{{.EXE}}
 
   test:
     desc: Run tests

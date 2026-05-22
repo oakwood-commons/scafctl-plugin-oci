@@ -2,9 +2,11 @@ package oci
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -15,10 +17,10 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -238,6 +240,21 @@ func TestDescribeWhatIf(t *testing.T) {
 			want:  "→",
 		},
 		{
+			name:  "mutate with dst",
+			input: map[string]any{"operation": OpMutate, "ref": "ghcr.io/org/app:v1", "dst": "ghcr.io/org/app:v2"},
+			want:  "Would mutate ghcr.io/org/app:v1 → ghcr.io/org/app:v2",
+		},
+		{
+			name:  "mutate with output",
+			input: map[string]any{"operation": OpMutate, "ref": "ghcr.io/org/app:v1", "output": "dist/image.tar"},
+			want:  "Would mutate ghcr.io/org/app:v1 → dist/image.tar",
+		},
+		{
+			name:  "mutate with layers and dst",
+			input: map[string]any{"operation": OpMutate, "ref": "ghcr.io/org/app:v1", "dst": "ghcr.io/org/app:v2", "layers": []any{"app.tar"}},
+			want:  "Would mutate (append 1 layer(s)) ghcr.io/org/app:v1 → ghcr.io/org/app:v2",
+		},
+		{
 			name:  "unknown op",
 			input: map[string]any{"operation": "foo"},
 			want:  "foo",
@@ -251,6 +268,17 @@ func TestDescribeWhatIf(t *testing.T) {
 			assert.Contains(t, desc, tt.want)
 		})
 	}
+
+	// Error cases.
+	t.Run("mutate with tag but no dst", func(t *testing.T) {
+		desc, err := p.DescribeWhatIf(ctx, ProviderName, map[string]any{
+			"operation": OpMutate,
+			"ref":       "ghcr.io/org/app:v1",
+			"tag":       "v2",
+		})
+		require.NoError(t, err)
+		assert.Contains(t, desc, "use \"dst\" instead")
+	})
 }
 
 func TestDescribeWhatIf_UnknownProvider(t *testing.T) {
@@ -966,6 +994,20 @@ func TestMutate_EmptyDst(t *testing.T) {
 	assert.Contains(t, err.Error(), "non-empty")
 }
 
+func TestMutate_TagWithoutDst(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        "ghcr.io/org/app:v1",
+		"tag":        "v2",
+		"entrypoint": "/app",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "use \"dst\" instead")
+}
+
 func TestMutate_StringEntrypoint(t *testing.T) {
 	srv, p := setupRegistry(t)
 	pushRandomImage(t, srv, "myorg/app:v1")
@@ -1096,10 +1138,14 @@ func TestAppend_ScratchNoDst(t *testing.T) {
 	p := &Plugin{}
 	ctx := context.Background()
 
+	tmpDir := t.TempDir()
+	layerFile := filepath.Join(tmpDir, "test.bin")
+	require.NoError(t, os.WriteFile(layerFile, []byte("data"), 0o600))
+
 	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
 		"operation": OpAppend,
 		"ref":       "scratch",
-		"layers":    []any{"/tmp/some-layer"},
+		"layers":    []any{layerFile},
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "dst")
@@ -2079,4 +2125,483 @@ func createAndPushMultiArchIndex(t *testing.T, ref string) {
 
 	err = remote.WriteIndex(parsedRef, idx)
 	require.NoError(t, err)
+}
+
+// --- coerceEnv tests ---
+
+func TestCoerceEnv_String(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		want    []string
+		wantErr string
+	}{
+		{
+			name:  "comma-separated string",
+			input: "HOME=/home/default,APP=myapp",
+			want:  []string{"HOME=/home/default", "APP=myapp"},
+		},
+		{
+			name:  "single key=value string",
+			input: "HOME=/test",
+			want:  []string{"HOME=/test"},
+		},
+		{
+			name:    "string missing equals",
+			input:   "NOVAL",
+			wantErr: "KEY=VALUE",
+		},
+		{
+			name:  "map input",
+			input: map[string]any{"HOME": "/test", "APP": "myapp"},
+			want:  []string{"APP=myapp", "HOME=/test"}, // sorted by key
+		},
+		{
+			name:  "array input",
+			input: []any{"HOME=/test", "APP=myapp"},
+			want:  []string{"HOME=/test", "APP=myapp"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := coerceEnv(tt.input)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// --- coerceStringMap tests ---
+
+func TestCoerceStringMap(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		want    map[string]string
+		wantErr string
+	}{
+		{
+			name:  "map input",
+			input: map[string]any{"key1": "val1", "key2": "val2"},
+			want:  map[string]string{"key1": "val1", "key2": "val2"},
+		},
+		{
+			name:  "comma-separated string",
+			input: "key1=val1,key2=val2",
+			want:  map[string]string{"key1": "val1", "key2": "val2"},
+		},
+		{
+			name:  "single key=value",
+			input: "test.label=hello",
+			want:  map[string]string{"test.label": "hello"},
+		},
+		{
+			name:    "string missing equals",
+			input:   "noval",
+			wantErr: "key=value",
+		},
+		{
+			name:    "unsupported type",
+			input:   42,
+			wantErr: "expected object",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := coerceStringMap(tt.input)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// --- Append with output tests ---
+
+func TestAppend_Output(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	// Push a base image.
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	// Create a temp file to use as a layer.
+	tmpDir := t.TempDir()
+	layerFile := filepath.Join(tmpDir, "test.bin")
+	require.NoError(t, os.WriteFile(layerFile, []byte("test binary content"), 0o600))
+
+	outputPath := filepath.Join(tmpDir, "output.tar")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpAppend,
+		"ref":       baseRef,
+		"layers":    []any{layerFile},
+		"output":    outputPath,
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.NotEmpty(t, data["digest"])
+	assert.Equal(t, outputPath, data["path"])
+
+	// Verify the file was written.
+	info, err := os.Stat(outputPath)
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0))
+}
+
+// --- totalImageSize tests ---
+
+func TestTotalImageSize(t *testing.T) {
+	img, err := random.Image(256, 2) // 2 layers
+	require.NoError(t, err)
+
+	total, err := totalImageSize(img)
+	require.NoError(t, err)
+	assert.Greater(t, total, int64(0))
+
+	// Size should be greater than manifest-only size.
+	manifestSize, err := img.Size()
+	require.NoError(t, err)
+	assert.Greater(t, total, manifestSize)
+}
+
+// --- isTarFile tests ---
+
+func TestIsTarFile(t *testing.T) {
+	assert.True(t, isTarFile("image.tar"))
+	assert.True(t, isTarFile("image.tar.gz"))
+	assert.True(t, isTarFile("image.tgz"))
+	assert.True(t, isTarFile("IMAGE.TAR.GZ"))
+	assert.False(t, isTarFile("binary"))
+	assert.False(t, isTarFile("app.exe"))
+	assert.False(t, isTarFile("data.json"))
+}
+
+// --- Layer root tests ---
+
+func TestLayerFromPath_RawFile_WithLayerRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "myapp")
+	require.NoError(t, os.WriteFile(testFile, []byte("binary content"), 0o600))
+
+	layer, err := layerFromPath(testFile, "/usr/local/bin")
+	require.NoError(t, err)
+
+	// Read the layer and verify the file is at the correct path.
+	rc, err := layer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/myapp", header.Name)
+}
+
+func TestLayerFromPath_RawFile_NoLayerRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "myapp")
+	require.NoError(t, os.WriteFile(testFile, []byte("binary content"), 0o600))
+
+	layer, err := layerFromPath(testFile, "")
+	require.NoError(t, err)
+
+	rc, err := layer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "myapp", header.Name)
+}
+
+func TestLayerFromPath_Directory_WithLayerRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	require.NoError(t, os.Mkdir(srcDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "file1.txt"), []byte("hello"), 0o600))
+
+	layer, err := layerFromPath(srcDir, "/app/data")
+	require.NoError(t, err)
+
+	rc, err := layer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "app/data/file1.txt", header.Name)
+}
+
+// --- Mutate with layer_root integration test ---
+
+func TestMutate_LayerRoot(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	tmpDir := t.TempDir()
+	binFile := filepath.Join(tmpDir, "chassis-mcp")
+	require.NoError(t, os.WriteFile(binFile, []byte("ELF binary"), 0o600))
+
+	outputPath := filepath.Join(tmpDir, "output.tar")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        baseRef,
+		"layers":     []any{binFile},
+		"layer_root": "/home/default",
+		"output":     outputPath,
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	// Size should reflect total image size, not just manifest.
+	size, ok := data["size"].(int64)
+	require.True(t, ok)
+	assert.Greater(t, size, int64(100)) // should be well above manifest size
+}
+
+// --- Mutate with env string input ---
+
+func TestMutate_EnvString(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	dstRef := fmt.Sprintf("%s/myorg/app:envtest", srv.Listener.Addr().String())
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       baseRef,
+		"dst":       dstRef,
+		"env":       "HOME=/home/default,APP=myapp",
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	// Verify the env vars were set.
+	parsed, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	img, err := remote.Image(parsed)
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Contains(t, cfgFile.Config.Env, "HOME=/home/default")
+	assert.Contains(t, cfgFile.Config.Env, "APP=myapp")
+}
+
+// --- Mutate with labels string input ---
+
+func TestMutate_LabelsString(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	dstRef := fmt.Sprintf("%s/myorg/app:labelstest", srv.Listener.Addr().String())
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation": OpMutate,
+		"ref":       baseRef,
+		"dst":       dstRef,
+		"labels":    "app.name=myapp,app.version=1.0",
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	// Verify labels.
+	parsed, err := name.ParseReference(dstRef)
+	require.NoError(t, err)
+	img, err := remote.Image(parsed)
+	require.NoError(t, err)
+	cfgFile, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, "myapp", cfgFile.Config.Labels["app.name"])
+	assert.Equal(t, "1.0", cfgFile.Config.Labels["app.version"])
+}
+
+// --- WhatIf tests for new operations ---
+
+func TestWhatIf_AppendWithOutput(t *testing.T) {
+	p := &Plugin{}
+	msg, err := p.DescribeWhatIf(context.Background(), ProviderName, map[string]any{
+		"operation":  OpAppend,
+		"ref":        "ghcr.io/org/app:v1.0",
+		"output":     "./out.tar",
+		"layer_root": "/usr/bin",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, msg, "./out.tar")
+	assert.Contains(t, msg, "/usr/bin")
+}
+
+// --- rewriteTarPrefix tests ---
+
+func TestRewriteTarPrefix_PlainTar(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a source tar with one entry.
+	srcTar := filepath.Join(tmpDir, "input.tar")
+	f, err := os.Create(srcTar) //nolint:gosec // test file in t.TempDir
+	require.NoError(t, err)
+	tw := tar.NewWriter(f)
+	content := []byte("hello world")
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name:     "myapp",
+		Size:     int64(len(content)),
+		Mode:     0o644,
+		Typeflag: tar.TypeReg,
+	}))
+	_, err = tw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	require.NoError(t, f.Close())
+
+	// Rewrite with prefix.
+	var buf bytes.Buffer
+	require.NoError(t, rewriteTarPrefix(&buf, srcTar, "/usr/local/bin"))
+
+	// Read back and verify path.
+	tr := tar.NewReader(&buf)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/myapp", header.Name)
+
+	body, err := io.ReadAll(tr)
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", string(body))
+
+	_, err = tr.Next()
+	assert.ErrorIs(t, err, io.EOF)
+}
+
+func TestRewriteTarPrefix_DirectoryEntries(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	srcTar := filepath.Join(tmpDir, "input.tar")
+	f, err := os.Create(srcTar) //nolint:gosec // test file in t.TempDir
+	require.NoError(t, err)
+	tw := tar.NewWriter(f)
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name:     "subdir/",
+		Typeflag: tar.TypeDir,
+		Mode:     0o755,
+	}))
+	content := []byte("data")
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Name:     "subdir/file.txt",
+		Size:     int64(len(content)),
+		Mode:     0o644,
+		Typeflag: tar.TypeReg,
+	}))
+	_, err = tw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	require.NoError(t, f.Close())
+
+	var buf bytes.Buffer
+	require.NoError(t, rewriteTarPrefix(&buf, srcTar, "/opt"))
+
+	tr := tar.NewReader(&buf)
+
+	h1, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "opt/subdir", h1.Name)
+
+	h2, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "opt/subdir/file.txt", h2.Name)
+}
+
+func TestRewriteTarPrefix_EmptyTar(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	srcTar := filepath.Join(tmpDir, "empty.tar")
+	f, err := os.Create(srcTar) //nolint:gosec // test file in t.TempDir
+	require.NoError(t, err)
+	tw := tar.NewWriter(f)
+	require.NoError(t, tw.Close())
+	require.NoError(t, f.Close())
+
+	var buf bytes.Buffer
+	require.NoError(t, rewriteTarPrefix(&buf, srcTar, "/app"))
+
+	tr := tar.NewReader(&buf)
+	_, err = tr.Next()
+	assert.ErrorIs(t, err, io.EOF)
+}
+
+// --- writeOutputTarball coverage tests ---
+
+func TestWriteOutputTarball_DigestRef(t *testing.T) {
+	p := &Plugin{}
+	img, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+	outPath := filepath.Join(tmpDir, "out.tar")
+
+	// Use a digest-only reference (non-Tag path).
+	digest, err := img.Digest()
+	require.NoError(t, err)
+	ref := "localhost/myapp@" + digest.String()
+
+	out, err := p.writeOutputTarball(img, ref, outPath)
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+	assert.Equal(t, outPath, data["path"])
+
+	info, err := os.Stat(outPath)
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0))
+}
+
+func TestWriteOutputTarball_InvalidRef(t *testing.T) {
+	p := &Plugin{}
+	img, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+	outPath := filepath.Join(tmpDir, "out.tar")
+
+	// Invalid ref triggers the fallback to localhost/mutated:latest.
+	out, err := p.writeOutputTarball(img, "scratch", outPath)
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
 }
