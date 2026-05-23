@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	sdkplugin "github.com/oakwood-commons/scafctl-plugin-sdk/plugin"
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,14 @@ func pushRandomImage(t *testing.T, srv *httptest.Server, repoTag string) {
 
 	err = remote.Write(ref, img)
 	require.NoError(t, err)
+}
+
+// openOutputTar loads a Docker-style image tarball written by the OCI provider.
+func openOutputTar(t *testing.T, path string) v1.Image {
+	t.Helper()
+	img, err := tarball.ImageFromPath(path, nil)
+	require.NoError(t, err)
+	return img
 }
 
 func TestGetProviders(t *testing.T) {
@@ -2297,7 +2306,7 @@ func TestLayerFromPath_RawFile_WithLayerRoot(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "myapp")
 	require.NoError(t, os.WriteFile(testFile, []byte("binary content"), 0o600))
 
-	layer, err := layerFromPath(testFile, "/usr/local/bin")
+	layer, err := layerFromPath(testFile, "/usr/local/bin", 0)
 	require.NoError(t, err)
 
 	// Read the layer and verify the file is at the correct path.
@@ -2316,7 +2325,7 @@ func TestLayerFromPath_RawFile_NoLayerRoot(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "myapp")
 	require.NoError(t, os.WriteFile(testFile, []byte("binary content"), 0o600))
 
-	layer, err := layerFromPath(testFile, "")
+	layer, err := layerFromPath(testFile, "", 0)
 	require.NoError(t, err)
 
 	rc, err := layer.Uncompressed()
@@ -2335,7 +2344,7 @@ func TestLayerFromPath_Directory_WithLayerRoot(t *testing.T) {
 	require.NoError(t, os.Mkdir(srcDir, 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "file1.txt"), []byte("hello"), 0o600))
 
-	layer, err := layerFromPath(srcDir, "/app/data")
+	layer, err := layerFromPath(srcDir, "/app/data", 0)
 	require.NoError(t, err)
 
 	rc, err := layer.Uncompressed()
@@ -2604,4 +2613,329 @@ func TestWriteOutputTarball_InvalidRef(t *testing.T) {
 	data, ok := out.Data.(map[string]any)
 	require.True(t, ok)
 	assert.True(t, data["success"].(bool))
+}
+
+// --- layer_mode tests ---
+
+func TestParseLayerMode_Absent(t *testing.T) {
+	mode, err := parseLayerMode(map[string]any{})
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0), mode)
+}
+
+func TestParseLayerMode_Empty(t *testing.T) {
+	mode, err := parseLayerMode(map[string]any{"layer_mode": ""})
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0), mode)
+}
+
+func TestParseLayerMode_Octal(t *testing.T) {
+	mode, err := parseLayerMode(map[string]any{"layer_mode": "0755"})
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), mode)
+}
+
+func TestParseLayerMode_DecimalString(t *testing.T) {
+	mode, err := parseLayerMode(map[string]any{"layer_mode": "493"}) // 0755 in decimal
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), mode)
+}
+
+func TestParseLayerMode_IntegerFromYAML(t *testing.T) {
+	// YAML/JSON parsers may pass 0755 (octal literal) as the integer 493.
+	mode, err := parseLayerMode(map[string]any{"layer_mode": 493}) // int
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), mode)
+}
+
+func TestParseLayerMode_Float64FromJSON(t *testing.T) {
+	// JSON numbers always unmarshal as float64.
+	mode, err := parseLayerMode(map[string]any{"layer_mode": float64(493)})
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), mode)
+}
+
+func TestParseLayerMode_InvalidString(t *testing.T) {
+	_, err := parseLayerMode(map[string]any{"layer_mode": "rwxr-xr-x"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "layer_mode")
+}
+
+func TestParseLayerMode_WrongType(t *testing.T) {
+	_, err := parseLayerMode(map[string]any{"layer_mode": []string{"0755"}})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "layer_mode")
+}
+
+func TestParseLayerMode_OtherIntTypes(t *testing.T) {
+	// Cover int32, uint, uint32, uint64 branches in parseLayerMode.
+	cases := []struct {
+		name  string
+		input any
+	}{
+		{"int32", int32(493)},
+		{"uint", uint(493)},
+		{"uint32", uint32(493)},
+		{"uint64", uint64(493)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mode, err := parseLayerMode(map[string]any{"layer_mode": tc.input})
+			require.NoError(t, err)
+			assert.Equal(t, os.FileMode(0o755), mode)
+		})
+	}
+}
+func TestLayerFromPath_RawFile_WithMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "myapp")
+	// Write with no execute bits (simulates Windows cross-compile output).
+	require.NoError(t, os.WriteFile(testFile, []byte("ELF binary"), 0o600))
+
+	layer, err := layerFromPath(testFile, "/usr/local/bin", 0o755)
+	require.NoError(t, err)
+
+	rc, err := layer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/myapp", header.Name)
+	assert.Equal(t, int64(0o755), header.Mode)
+}
+
+func TestLayerFromPath_Directory_WithMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	require.NoError(t, os.Mkdir(srcDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "app"), []byte("binary"), 0o600))
+
+	layer, err := layerFromPath(srcDir, "/usr/local/bin", 0o755)
+	require.NoError(t, err)
+
+	rc, err := layer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/app", header.Name)
+	assert.Equal(t, int64(0o755), header.Mode)
+}
+
+func TestMutate_LayerMode(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	tmpDir := t.TempDir()
+	binFile := filepath.Join(tmpDir, "myapp")
+	// Write with no execute bits (simulates Windows cross-compile output).
+	require.NoError(t, os.WriteFile(binFile, []byte("ELF binary"), 0o600))
+
+	outputPath := filepath.Join(tmpDir, "output.tar")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        baseRef,
+		"layers":     []any{binFile},
+		"layer_root": "/usr/local/bin",
+		"layer_mode": "0755",
+		"output":     outputPath,
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	// Verify the file has 0755 permissions in the layer.
+	img := openOutputTar(t, outputPath)
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	require.NotEmpty(t, layers)
+
+	// The last layer is the one we appended.
+	lastLayer := layers[len(layers)-1]
+	rc, err := lastLayer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/myapp", header.Name)
+	assert.Equal(t, int64(0o755), header.Mode)
+}
+
+func TestMutate_LayerMode_InvalidValue(t *testing.T) {
+	p := &Plugin{}
+	ctx := context.Background()
+	_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpMutate,
+		"ref":        "scratch",
+		"dst":        "localhost/foo:test",
+		"layers":     []any{"nonexistent"},
+		"layer_mode": "rwxr-xr-x",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "layer_mode")
+}
+
+func TestAppend_LayerMode(t *testing.T) {
+	srv, p := setupRegistry(t)
+
+	baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+	pushRandomImage(t, srv, "myorg/app:base")
+
+	tmpDir := t.TempDir()
+	binFile := filepath.Join(tmpDir, "tool")
+	require.NoError(t, os.WriteFile(binFile, []byte("binary"), 0o600))
+
+	outputPath := filepath.Join(tmpDir, "out.tar")
+
+	ctx := context.Background()
+	out, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+		"operation":  OpAppend,
+		"ref":        baseRef,
+		"layers":     []any{binFile},
+		"layer_root": "/usr/local/bin",
+		"layer_mode": "0755",
+		"output":     outputPath,
+	})
+	require.NoError(t, err)
+
+	data, ok := out.Data.(map[string]any)
+	require.True(t, ok)
+	assert.True(t, data["success"].(bool))
+
+	img := openOutputTar(t, outputPath)
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	require.NotEmpty(t, layers)
+
+	lastLayer := layers[len(layers)-1]
+	rc, err := lastLayer.Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	tr := tar.NewReader(rc)
+	header, err := tr.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "usr/local/bin/tool", header.Name)
+	assert.Equal(t, int64(0o755), header.Mode)
+}
+
+// readLastLayerHeader opens the output tarball and returns the first tar entry
+// header from the last appended layer.
+func readLastLayerHeader(t *testing.T, outputPath string) *tar.Header {
+	t.Helper()
+	img := openOutputTar(t, outputPath)
+
+	layers, err := img.Layers()
+	require.NoError(t, err)
+	require.NotEmpty(t, layers)
+
+	rc, err := layers[len(layers)-1].Uncompressed()
+	require.NoError(t, err)
+	defer rc.Close() //nolint:errcheck // test cleanup
+
+	header, err := tar.NewReader(rc).Next()
+	require.NoError(t, err)
+	return header
+}
+
+// TestMutate_LayerMode_InputTypes verifies that layer_mode works regardless of
+// how the value arrives (string, YAML octal integer, JSON float64). The YAML case
+// is the most important: unquoted 0755 in a solution file is parsed as the integer
+// 493 by Go's YAML decoder, not as the string "0755".
+func TestMutate_LayerMode_InputTypes(t *testing.T) {
+	const wantMode = int64(0o755)
+	// 0o755 == 493 decimal
+	cases := []struct {
+		name      string
+		layerMode any
+	}{
+		{"octal string", "0755"},
+		{"go octal string", "0o755"},
+		{"decimal string", "493"},
+		{"int from YAML octal", int(493)},
+		{"int64 from YAML", int64(493)},
+		{"float64 from JSON", float64(493)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, p := setupRegistry(t)
+			baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+			pushRandomImage(t, srv, "myorg/app:base")
+
+			tmpDir := t.TempDir()
+			binFile := filepath.Join(tmpDir, "myapp")
+			require.NoError(t, os.WriteFile(binFile, []byte("ELF"), 0o600))
+			outputPath := filepath.Join(tmpDir, "out.tar")
+
+			ctx := context.Background()
+			_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+				"operation":  OpMutate,
+				"ref":        baseRef,
+				"layers":     []any{binFile},
+				"layer_root": "/usr/local/bin",
+				"layer_mode": tc.layerMode,
+				"output":     outputPath,
+			})
+			require.NoError(t, err, "layer_mode input type %T should not cause an error", tc.layerMode)
+
+			header := readLastLayerHeader(t, outputPath)
+			assert.Equal(t, wantMode, header.Mode,
+				"layer_mode input %v (%T) should produce 0755 in the tar header", tc.layerMode, tc.layerMode)
+		})
+	}
+}
+
+// TestAppend_LayerMode_InputTypes mirrors TestMutate_LayerMode_InputTypes for
+// the append operation.
+func TestAppend_LayerMode_InputTypes(t *testing.T) {
+	const wantMode = int64(0o755)
+	cases := []struct {
+		name      string
+		layerMode any
+	}{
+		{"octal string", "0755"},
+		{"int from YAML octal", int(493)},
+		{"float64 from JSON", float64(493)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, p := setupRegistry(t)
+			baseRef := fmt.Sprintf("%s/myorg/app:base", srv.Listener.Addr().String())
+			pushRandomImage(t, srv, "myorg/app:base")
+
+			tmpDir := t.TempDir()
+			binFile := filepath.Join(tmpDir, "tool")
+			require.NoError(t, os.WriteFile(binFile, []byte("binary"), 0o600))
+			outputPath := filepath.Join(tmpDir, "out.tar")
+
+			ctx := context.Background()
+			_, err := p.ExecuteProvider(ctx, ProviderName, map[string]any{
+				"operation":  OpAppend,
+				"ref":        baseRef,
+				"layers":     []any{binFile},
+				"layer_root": "/usr/local/bin",
+				"layer_mode": tc.layerMode,
+				"output":     outputPath,
+			})
+			require.NoError(t, err, "layer_mode input type %T should not cause an error", tc.layerMode)
+
+			header := readLastLayerHeader(t, outputPath)
+			assert.Equal(t, wantMode, header.Mode,
+				"layer_mode input %v (%T) should produce 0755 in the tar header", tc.layerMode, tc.layerMode)
+		})
+	}
 }

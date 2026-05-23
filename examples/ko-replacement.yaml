@@ -148,8 +148,10 @@ spec:
             rslvr: platform
           layers:
             - rslvr: buildDir
+          layer_root: /usr/local/bin
+          layer_mode: 0755   # required when cross-compiling on Windows; harmless on Linux
           entrypoint:
-            - /app
+            - /usr/local/bin/app
           labels:
             quay.expires-after:
               rslvr: expiry
