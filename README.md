@@ -192,8 +192,11 @@ Append layer(s) to a base image. Supports `ref: scratch` for building from-scrat
 | Input | Required | Description |
 |-------|----------|-------------|
 | `ref` | yes | Base image reference (or `scratch`) |
-| `layers` | yes | Array of file/directory paths to add as layers |
+| `layers` | yes | Array of file/directory/tarball paths to add as layers |
 | `dst` | no | Destination reference (required when `ref` is `scratch`) |
+| `layer_root` | no | Destination path prefix inside the container (e.g., `/usr/local/bin`) |
+| `layer_mode` | no | Unix permission bits for every regular file entry (e.g., `0755`). Required when cross-compiling on Windows — see [Windows note](#cross-platform-windows) |
+| `output` | no | Write result to a local tarball instead of pushing |
 | `platform` | no | Target platform for multi-arch base images |
 
 **Output**: `success`, `ref`, `digest`, `size`
@@ -215,7 +218,9 @@ Modify image config fields, optionally append layers and apply OCI annotations. 
 | `annotations` | no | OCI manifest annotations (key-value map, distinct from labels) |
 | `exposed_ports` | no | Ports to expose (array of `port/proto`, e.g., `["8080/tcp"]`) |
 | `set_platform` | no | Set platform `os/arch` on the image config |
-| `layers` | no | Layer paths to append |
+| `layers` | no | Layer paths to append (files, directories, or tarballs) |
+| `layer_root` | no | Destination path prefix inside the container (e.g., `/usr/local/bin`) |
+| `layer_mode` | no | Unix permission bits for every regular file entry (e.g., `0755`). Required when cross-compiling on Windows — see [Windows note](#cross-platform-windows) |
 | `config` | no | Nested config map (alternative to convenience inputs above) |
 | `output` | no | Write mutated image to local tarball instead of pushing to registry |
 | `platform` | no | Target platform for multi-arch base images |
@@ -225,6 +230,27 @@ Convenience inputs (`entrypoint`, `cmd`, etc.) override nested `config` fields. 
 When `output` is set, the mutated image is written to a local tarball file instead of being pushed to a registry.
 
 **Output**: `success`, `ref`, `digest`, `size` (or `success`, `path`, `digest`, `size` when `output` is set)
+
+#### Cross-platform (Windows) {#cross-platform-windows}
+
+Go's `os.FileInfo.Mode()` on Windows does not set Unix execute bits. Raw files or directories appended on a Windows host will land in the layer as `rw-rw-rw-` (0666), causing `CreateContainerError` at runtime.
+
+Set `layer_mode: 0755` for any layers containing executables:
+
+```yaml
+provider: oci
+inputs:
+  operation: mutate
+  ref: cgr.dev/chainguard/static:latest
+  layers:
+    - dist/myapp        # cross-compiled on Windows
+  layer_root: /usr/local/bin
+  layer_mode: 0755     # required on Windows; harmless on Linux
+  entrypoint: ["/usr/local/bin/myapp"]
+  dst: ghcr.io/myorg/myapp:v1
+```
+
+> **Note:** In solution YAML, write `layer_mode: 0755` (unquoted). The YAML parser converts this to the integer 493 (octal), which the provider accepts. Both `0755` and `"0755"` work.
 
 ### `tag`
 
@@ -352,6 +378,11 @@ scafctl run provider oci operation=mutate ref=ghcr.io/myorg/app:v1 entrypoint=/a
 
 # Mutate to local tarball
 scafctl run provider oci operation=mutate ref=ghcr.io/myorg/app:v1 user=nobody output=./mutated.tar
+
+# Append a cross-compiled binary with correct permissions (Windows host)
+scafctl run provider oci operation=mutate ref=cgr.dev/chainguard/static:latest \
+  layers=dist/myapp layer_root=/usr/local/bin layer_mode=0755 \
+  entrypoint=/usr/local/bin/myapp dst=ghcr.io/myorg/myapp:v1
 
 # Validate image integrity
 scafctl run provider oci operation=validate ref=ghcr.io/myorg/app:v1

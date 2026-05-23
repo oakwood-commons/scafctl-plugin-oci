@@ -15,7 +15,9 @@ import (
 
 // writeTarDir writes the contents of a directory as a tar archive to w.
 // When layerRoot is non-empty, all paths are prefixed with it inside the tar.
-func writeTarDir(w io.Writer, dir, layerRoot string) error {
+// When mode is non-zero, it overrides the Unix permission bits on every regular
+// file entry (directories keep their own permissions).
+func writeTarDir(w io.Writer, dir, layerRoot string, mode os.FileMode) error {
 	// Resolve to absolute to prevent path traversal.
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
@@ -59,6 +61,9 @@ func writeTarDir(w io.Writer, dir, layerRoot string) error {
 			name = strings.TrimLeft(filepath.ToSlash(filepath.Join(layerRoot, rel)), "/")
 		}
 		header.Name = name
+		if mode != 0 && !info.IsDir() {
+			header.Mode = int64(mode)
+		}
 
 		if err := tw.WriteHeader(header); err != nil {
 			return err
@@ -104,13 +109,18 @@ func isTarFile(path string) bool {
 
 // writeSingleFileTar writes a single file as a tar entry with the given
 // in-container destination name.
-func writeSingleFileTar(w io.Writer, srcPath, destName string, fi os.FileInfo) error {
+// When mode is non-zero, it overrides the Unix permission bits on the entry.
+func writeSingleFileTar(w io.Writer, srcPath, destName string, fi os.FileInfo, mode os.FileMode) error {
 	tw := tar.NewWriter(w)
 
+	fileMode := int64(fi.Mode().Perm())
+	if mode != 0 {
+		fileMode = int64(mode)
+	}
 	header := &tar.Header{
 		Name: strings.TrimLeft(filepath.ToSlash(destName), "/"),
 		Size: fi.Size(),
-		Mode: int64(fi.Mode().Perm()),
+		Mode: fileMode,
 	}
 
 	if err := tw.WriteHeader(header); err != nil {
