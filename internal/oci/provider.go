@@ -206,7 +206,31 @@ func (p *Plugin) DescribeWhatIf(_ context.Context, providerName string, input ma
 	case OpPush:
 		return fmt.Sprintf("Would push %s from %s", ref, path), nil
 	case OpCopy:
-		return fmt.Sprintf("Would copy %s to %s", src, dst), nil
+		plat, _, perr := parseCopyPlatform(input)
+		if perr != nil {
+			return "", perr
+		}
+		msg := fmt.Sprintf("Would copy %s to %s", src, dst)
+		if plat != nil {
+			msg += fmt.Sprintf(" (platform %s)", plat)
+		} else {
+			msg += " (full content, blobs first)"
+		}
+		skip, serr := wantSkip(input)
+		if serr != nil {
+			return "", serr
+		}
+		if skip {
+			msg += ", skipping if destination digest already matches"
+		}
+		preserve, prerr := wantPreserveReferrers(input)
+		if prerr != nil {
+			return "", prerr
+		}
+		if preserve {
+			msg += ", preserving referrers/signatures"
+		}
+		return msg, nil
 	case OpAppend:
 		msg := fmt.Sprintf("Would append layer(s) to %s", ref)
 		output, _ := input["output"].(string)
@@ -558,9 +582,14 @@ func (p *Plugin) executePull(ctx context.Context, input map[string]any) (*sdkpro
 		return nil, err
 	}
 
-	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, platOpts...)...)
+	retryOpts, err := parseRetry(input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching image %q: %w", ref, err)
+		return nil, err
+	}
+
+	desc, err := remote.Get(imgRef, p.remoteOptions(ctx, append(platOpts, retryOpts...)...)...)
+	if err != nil {
+		return nil, mapRegistryError(fmt.Sprintf("pull: fetching image %q", ref), err)
 	}
 
 	img, err := desc.Image()
@@ -617,8 +646,13 @@ func (p *Plugin) executePush(ctx context.Context, input map[string]any) (*sdkpro
 		return nil, fmt.Errorf("reading tarball from %q: %w", path, err)
 	}
 
-	if err := remote.Write(imgRef, img, p.remoteOptions(ctx)...); err != nil {
-		return nil, fmt.Errorf("pushing image to %q: %w", ref, err)
+	retryOpts, err := parseRetry(input)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := remote.Write(imgRef, img, p.remoteOptions(ctx, retryOpts...)...); err != nil {
+		return nil, mapRegistryError(fmt.Sprintf("push: writing image to %q", ref), err)
 	}
 
 	digest, err := img.Digest()
@@ -631,17 +665,28 @@ func (p *Plugin) executePush(ctx context.Context, input map[string]any) (*sdkpro
 		return nil, fmt.Errorf("getting size: %w", err)
 	}
 
+	mediaType := ""
+	if mt, mtErr := img.MediaType(); mtErr == nil {
+		mediaType = string(mt)
+	}
+
 	return &sdkprovider.Output{
 		Data: map[string]any{
-			"success": true,
-			"ref":     ref,
-			"digest":  digest.String(),
-			"size":    size,
+			"success":   true,
+			"ref":       ref,
+			"digest":    digest.String(),
+			"size":      size,
+			"mediaType": mediaType,
 		},
 	}, nil
 }
 
-// executeCopy copies an image between registries.
+// executeCopy mirrors an image (or multi-arch index) between registries.
+//
+// Unlike a raw manifest PUT, this replicates all referenced blobs (config and
+// layers) before writing the manifest and recurses into multi-arch index
+// children, matching `crane copy` semantics. This is required by registries
+// that enforce blob-before-manifest ordering.
 func (p *Plugin) executeCopy(ctx context.Context, input map[string]any) (*sdkprovider.Output, error) {
 	src, err := requireString(input, "src")
 	if err != nil {
@@ -663,25 +708,135 @@ func (p *Plugin) executeCopy(ctx context.Context, input map[string]any) (*sdkpro
 		return nil, err
 	}
 
-	desc, err := remote.Get(srcRef, p.remoteOptions(ctx)...)
+	plat, _, err := parseCopyPlatform(input)
 	if err != nil {
-		return nil, fmt.Errorf("fetching source %q: %w", src, err)
+		return nil, err
 	}
 
-	// Copy the full descriptor (handles both images and indexes).
-	if err := remote.Put(dstRef, desc, p.remoteOptions(ctx)...); err != nil {
-		return nil, fmt.Errorf("pushing to destination %q: %w", dst, err)
+	retryOpts, err := parseRetry(input)
+	if err != nil {
+		return nil, err
+	}
+	opts := p.remoteOptions(ctx, retryOpts...)
+
+	// Fetch the source descriptor, narrowing to a single platform when requested.
+	getOpts := opts
+	if plat != nil {
+		getOpts = p.remoteOptions(ctx, append(retryOpts, remote.WithPlatform(*plat))...)
+	}
+	desc, err := remote.Get(srcRef, getOpts...)
+	if err != nil {
+		return nil, mapRegistryError(fmt.Sprintf("copy: fetching source %q", src), err)
+	}
+
+	// Resolve the expected destination content up front. For a narrowed copy the
+	// written manifest is the single-platform image, whose digest differs from the
+	// source index digest returned by remote.Get; computing it here keeps the skip
+	// comparison and reported output consistent with what is actually written.
+	finalDigest := desc.Digest.String()
+	finalSize := desc.Size
+	finalMediaType := string(desc.MediaType)
+
+	var narrowedImg v1.Image
+	if plat != nil {
+		narrowedImg, err = desc.Image()
+		if err != nil {
+			return nil, fmt.Errorf("copy: resolving %s image for %q: %w", plat, src, err)
+		}
+		if d, derr := narrowedImg.Digest(); derr == nil {
+			finalDigest = d.String()
+		}
+		if s, serr := narrowedImg.Size(); serr == nil {
+			finalSize = s
+		}
+		if mt, mterr := narrowedImg.MediaType(); mterr == nil {
+			finalMediaType = string(mt)
+		}
+	}
+
+	// Idempotency: skip the manifest write when the destination already holds the
+	// same content. Referrers are still reconciled below so newly attached
+	// signatures are mirrored even when the subject itself is unchanged.
+	skip, err := wantSkip(input)
+	if err != nil {
+		return nil, err
+	}
+	var warnings []string
+	skipped := false
+	if skip {
+		if existing, herr := remote.Head(dstRef, opts...); herr == nil && existing.Digest.String() == finalDigest {
+			// A matching manifest digest is necessary but not sufficient: an
+			// interrupted prior copy can leave the manifest present while its
+			// config/layer blobs are missing. Only honor the skip when the
+			// destination content is fully present so a rerun can still repair a
+			// broken image.
+			complete, cerr := p.destinationComplete(ctx, dstRef, plat, narrowedImg, desc, opts)
+			if cerr != nil {
+				warnings = append(warnings, fmt.Sprintf("skip verification failed, performing full copy: %v", cerr))
+			}
+			skipped = complete
+		}
+	}
+
+	if !skipped {
+		switch {
+		case plat != nil:
+			// Narrowed copy: write the already-resolved single-platform image.
+			if werr := remote.Write(dstRef, narrowedImg, opts...); werr != nil {
+				return nil, mapRegistryError(fmt.Sprintf("copy: writing image to %q", dst), werr)
+			}
+		case desc.MediaType.IsIndex():
+			idx, ierr := desc.ImageIndex()
+			if ierr != nil {
+				return nil, fmt.Errorf("copy: resolving index for %q: %w", src, ierr)
+			}
+			if werr := remote.WriteIndex(dstRef, idx, opts...); werr != nil {
+				return nil, mapRegistryError(fmt.Sprintf("copy: writing index to %q", dst), werr)
+			}
+		case desc.MediaType.IsImage():
+			img, ierr := desc.Image()
+			if ierr != nil {
+				return nil, fmt.Errorf("copy: resolving image for %q: %w", src, ierr)
+			}
+			if werr := remote.Write(dstRef, img, opts...); werr != nil {
+				return nil, mapRegistryError(fmt.Sprintf("copy: writing image to %q", dst), werr)
+			}
+		default:
+			// Schema 1 or other non-standard manifests: best-effort raw copy.
+			if werr := remote.Put(dstRef, desc, opts...); werr != nil {
+				return nil, mapRegistryError(fmt.Sprintf("copy: writing manifest to %q", dst), werr)
+			}
+		}
+	}
+
+	data := map[string]any{
+		"success":         true,
+		"skipped":         skipped,
+		"src":             src,
+		"dst":             dst,
+		"ref":             dst,
+		"digest":          finalDigest,
+		"size":            finalSize,
+		"mediaType":       finalMediaType,
+		"referrersCopied": 0,
+	}
+
+	// Preserve referrers (cosign signatures/attestations) unless disabled.
+	preserve, err := wantPreserveReferrers(input)
+	if err != nil {
+		return nil, err
+	}
+	if preserve {
+		n, rerr := p.copyReferrers(ctx, srcRef, dstRef, finalDigest, opts)
+		data["referrersCopied"] = n
+		if rerr != nil {
+			warnings = append(warnings, fmt.Sprintf("referrers preservation incomplete: %v", rerr))
+		}
 	}
 
 	return &sdkprovider.Output{
-		Data: map[string]any{
-			"success":   true,
-			"src":       src,
-			"dst":       dst,
-			"digest":    desc.Digest.String(),
-			"size":      desc.Size,
-			"mediaType": string(desc.MediaType),
-		},
+		Warnings: warnings,
+		Data:     data,
 	}, nil
 }
 
@@ -2132,8 +2287,22 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("./image.tar"),
 			),
 			"platform": sdkhelper.StringProp(
-				"Target platform (os/arch) for pull, append, and mutate operations on multi-arch images",
+				"Target platform (os/arch[/variant]) for pull, append, and mutate on multi-arch images. "+
+					"For copy, selects a single arch from a multi-arch index; use \"all\" (the default) to copy the full index",
 				sdkhelper.WithExample("linux/amd64"),
+			),
+			"skipIfExists": sdkhelper.BoolProp(
+				"For copy: skip the write when the destination already holds the same content (digest compare). Makes repeated mirrors fast and cheap",
+			),
+			"force": sdkhelper.BoolProp(
+				"For copy: set to false as the inverse of skipIfExists (force=false means skip when the destination digest already matches)",
+			),
+			"preserveReferrers": sdkhelper.BoolProp(
+				"For copy: also mirror referrers (cosign signatures, attestations, SBOMs) attached to the source. Defaults to true",
+			),
+			"retry": sdkhelper.AnyProp(
+				"Retry tuning for registry operations (pull/push/copy). Accepts true to enable defaults, an integer " +
+					"attempt count, or a map {attempts: int, backoff: \"1s\", maxBackoff: \"30s\"}. Defaults retry 408/429/5xx responses",
 			),
 			"layers": sdkhelper.ArrayProp(
 				"Layer paths to append (files, directories, or tarballs); supported in append and mutate operations",
@@ -2228,23 +2397,25 @@ func buildInputSchema() *jsonschema.Schema {
 func buildOutputSchemas() map[sdkprovider.Capability]*jsonschema.Schema {
 	return map[sdkprovider.Capability]*jsonschema.Schema{
 		sdkprovider.CapabilityAction: sdkhelper.ObjectSchema(nil, map[string]*jsonschema.Schema{
-			"success":      sdkhelper.BoolProp("Whether the operation succeeded"),
-			"digest":       sdkhelper.StringProp("Image digest (sha256:...)"),
-			"size":         sdkhelper.IntProp("Image size in bytes"),
-			"mediaType":    sdkhelper.StringProp("Manifest media type"),
-			"manifest":     sdkhelper.StringProp("Raw manifest JSON (manifest operation)"),
-			"tags":         sdkhelper.ArrayProp("List of tags (ls operation)", sdkhelper.WithItems(sdkhelper.StringProp("tag"))),
-			"repository":   sdkhelper.StringProp("Repository name"),
-			"registry":     sdkhelper.StringProp("Registry hostname"),
-			"repositories": sdkhelper.ArrayProp("List of repositories (catalog operation)", sdkhelper.WithItems(sdkhelper.StringProp("repository"))),
-			"ref":          sdkhelper.StringProp("Image reference"),
-			"src":          sdkhelper.StringProp("Source image reference (copy operation)"),
-			"dst":          sdkhelper.StringProp("Destination image reference (copy operation)"),
-			"path":         sdkhelper.StringProp("Local file path (pull operation)"),
-			"config":       sdkhelper.StringProp("Raw image config JSON (config operation)"),
-			"tag":          sdkhelper.StringProp("Applied tag reference (tag operation)"),
-			"layerCount":   sdkhelper.IntProp("Number of layers (validate operation)"),
-			"error":        sdkhelper.StringProp("Validation error message (validate operation)"),
+			"success":         sdkhelper.BoolProp("Whether the operation succeeded"),
+			"skipped":         sdkhelper.BoolProp("Whether the copy was skipped because the destination already matched (skipIfExists)"),
+			"digest":          sdkhelper.StringProp("Image digest (sha256:...)"),
+			"size":            sdkhelper.IntProp("Image size in bytes"),
+			"mediaType":       sdkhelper.StringProp("Manifest media type"),
+			"manifest":        sdkhelper.StringProp("Raw manifest JSON (manifest operation)"),
+			"tags":            sdkhelper.ArrayProp("List of tags (ls operation)", sdkhelper.WithItems(sdkhelper.StringProp("tag"))),
+			"repository":      sdkhelper.StringProp("Repository name"),
+			"registry":        sdkhelper.StringProp("Registry hostname"),
+			"repositories":    sdkhelper.ArrayProp("List of repositories (catalog operation)", sdkhelper.WithItems(sdkhelper.StringProp("repository"))),
+			"ref":             sdkhelper.StringProp("Image reference"),
+			"src":             sdkhelper.StringProp("Source image reference (copy operation)"),
+			"dst":             sdkhelper.StringProp("Destination image reference (copy operation)"),
+			"path":            sdkhelper.StringProp("Local file path (pull operation)"),
+			"config":          sdkhelper.StringProp("Raw image config JSON (config operation)"),
+			"tag":             sdkhelper.StringProp("Applied tag reference (tag operation)"),
+			"layerCount":      sdkhelper.IntProp("Number of layers (validate operation)"),
+			"referrersCopied": sdkhelper.IntProp("Number of referrer manifests (signatures/attestations) mirrored (copy operation)"),
+			"error":           sdkhelper.StringProp("Validation error message (validate operation)"),
 		}),
 		sdkprovider.CapabilityFrom: sdkhelper.ObjectSchema(nil, map[string]*jsonschema.Schema{
 			"success":      sdkhelper.BoolProp("Whether the operation succeeded"),
