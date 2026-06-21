@@ -9,7 +9,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -836,9 +838,19 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 	layerRoot, _ := input["layer_root"].(string)
 	layerRoot = sanitizeLayerRoot(layerRoot)
 
+	layerMode, err := parseLayerMode(input)
+	if err != nil {
+		return nil, err
+	}
+
+	var warnings []string
+	if runtime.GOOS == "windows" && layerMode == 0 {
+		warnings = append(warnings, "layer_mode is not set; raw files copied from Windows may lack execute permissions in the container. Set layer_mode=\"0755\" for binaries.")
+	}
+
 	var layers []v1.Layer
 	for _, lp := range layerPaths {
-		layer, layerErr := layerFromPath(lp, layerRoot)
+		layer, layerErr := layerFromPath(lp, layerRoot, layerMode)
 		if layerErr != nil {
 			return nil, fmt.Errorf("creating layer from %q: %w", lp, layerErr)
 		}
@@ -852,7 +864,12 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 
 	// If output path is set, write to tarball instead of pushing to registry.
 	if outputPath != "" {
-		return p.writeOutputTarball(newImg, ref, outputPath)
+		out, writeErr := p.writeOutputTarball(newImg, ref, outputPath)
+		if writeErr != nil {
+			return nil, writeErr
+		}
+		out.Warnings = warnings
+		return out, nil
 	}
 
 	if err := remote.Write(dstRef, newImg, p.remoteOptions(ctx)...); err != nil {
@@ -870,6 +887,7 @@ func (p *Plugin) executeAppend(ctx context.Context, input map[string]any) (*sdkp
 	}
 
 	return &sdkprovider.Output{
+		Warnings: warnings,
 		Data: map[string]any{
 			"success": true,
 			"ref":     dstStr,
@@ -910,12 +928,23 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 			return nil, layersErr
 		}
 	}
+
+	layerMode, err := parseLayerMode(input)
+	if err != nil {
+		return nil, err
+	}
+
+	var warnings []string
+	if runtime.GOOS == "windows" && layerMode == 0 && len(layerPaths) > 0 {
+		warnings = append(warnings, "layer_mode is not set; raw files copied from Windows may lack execute permissions in the container. Set layer_mode=\"0755\" for binaries.")
+	}
+
 	if len(layerPaths) > 0 {
 		layerRoot, _ := input["layer_root"].(string)
 		layerRoot = sanitizeLayerRoot(layerRoot)
 		var layers []v1.Layer
 		for _, lp := range layerPaths {
-			layer, layerErr := layerFromPath(lp, layerRoot)
+			layer, layerErr := layerFromPath(lp, layerRoot, layerMode)
 			if layerErr != nil {
 				return nil, fmt.Errorf("creating layer from %q: %w", lp, layerErr)
 			}
@@ -962,7 +991,12 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 
 	// If output path is set, write to tarball instead of pushing to registry.
 	if outputPath, _ := input["output"].(string); outputPath != "" {
-		return p.writeOutputTarball(img, ref, outputPath)
+		out, writeErr := p.writeOutputTarball(img, ref, outputPath)
+		if writeErr != nil {
+			return nil, writeErr
+		}
+		out.Warnings = warnings
+		return out, nil
 	}
 
 	// Determine destination: dst overrides ref.
@@ -986,6 +1020,7 @@ func (p *Plugin) executeMutate(ctx context.Context, input map[string]any) (*sdkp
 	}
 
 	return &sdkprovider.Output{
+		Warnings: warnings,
 		Data: map[string]any{
 			"success": true,
 			"ref":     dstStr,
@@ -1695,7 +1730,9 @@ func getStringSlice(input map[string]any, field string) ([]string, error) {
 // For directories, the tar is built lazily via an opener to avoid goroutine leaks.
 // When layerRoot is non-empty, files are placed under that prefix inside the container.
 // Raw (non-tar) files are wrapped in a single-entry tar layer.
-func layerFromPath(path, layerRoot string) (v1.Layer, error) {
+// When mode is non-zero, it overrides Unix permission bits on every regular file
+// in the layer. Tarball inputs are not affected — they retain their embedded modes.
+func layerFromPath(path, layerRoot string, mode os.FileMode) (v1.Layer, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolving path %q: %w", path, err)
@@ -1710,7 +1747,7 @@ func layerFromPath(path, layerRoot string) (v1.Layer, error) {
 		opener := func() (io.ReadCloser, error) {
 			pr, pw := io.Pipe()
 			go func() {
-				pw.CloseWithError(writeTarDir(pw, absPath, layerRoot))
+				pw.CloseWithError(writeTarDir(pw, absPath, layerRoot, mode))
 			}()
 			return pr, nil
 		}
@@ -1741,11 +1778,60 @@ func layerFromPath(path, layerRoot string) (v1.Layer, error) {
 	opener := func() (io.ReadCloser, error) {
 		pr, pw := io.Pipe()
 		go func() {
-			pw.CloseWithError(writeSingleFileTar(pw, absPath, destName, fi))
+			pw.CloseWithError(writeSingleFileTar(pw, absPath, destName, fi, mode))
 		}()
 		return pr, nil
 	}
 	return tarball.LayerFromOpener(opener)
+}
+
+// parseLayerMode parses the optional "layer_mode" input field into an os.FileMode.
+// Accepts an octal string ("0755"), a Go-style octal prefix string ("0o755"), or
+// an integer/float64 value (e.g., from YAML/JSON parsing of an unquoted octal
+// literal). Returns 0 if the field is absent or empty, which signals callers to
+// preserve the source file permissions.
+func parseLayerMode(input map[string]any) (os.FileMode, error) {
+	raw, ok := input["layer_mode"]
+	if !ok {
+		return 0, nil
+	}
+
+	var mode int64
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return 0, nil
+		}
+		n, err := strconv.ParseUint(v, 0, 32)
+		if err != nil {
+			return 0, fmt.Errorf("invalid layer_mode %q: expected an octal string such as \"0755\"", v)
+		}
+		mode = int64(n)
+	case int:
+		mode = int64(v)
+	case int32:
+		mode = int64(v)
+	case int64:
+		mode = v
+	case uint:
+		mode = int64(v) //nolint:gosec // validated below
+	case uint32:
+		mode = int64(v)
+	case uint64:
+		mode = int64(v) //nolint:gosec // validated below
+	case float64: // JSON/YAML numbers unmarshal as float64
+		if v != float64(int64(v)) {
+			return 0, fmt.Errorf("layer_mode must be a whole number, got %v", v)
+		}
+		mode = int64(v)
+	default:
+		return 0, fmt.Errorf("layer_mode must be a string (e.g., \"0755\") or integer, got %T", raw)
+	}
+
+	if mode < 0 || mode > 0o7777 {
+		return 0, fmt.Errorf("layer_mode %d (0o%o) is out of range; must be between 0 and 0o7777 (4095)", mode, mode)
+	}
+	return os.FileMode(mode), nil
 }
 
 // mergeConvenienceConfig builds a config map from top-level convenience inputs
@@ -2057,6 +2143,13 @@ func buildInputSchema() *jsonschema.Schema {
 				"Destination prefix path for appended layers inside the container (e.g., /usr/local/bin). "+
 					"Raw files and directories are placed under this path",
 				sdkhelper.WithExample("/home/default"),
+			),
+			"layer_mode": sdkhelper.AnyProp(
+				"Unix permission bits to apply to every regular file in appended layers. "+
+					"Accepts an octal string (\"0755\") or integer (0755 in YAML becomes 493). "+
+					"Required when cross-compiling on Windows because Go's os.FileInfo "+
+					"does not set execute bits. When absent, source file permissions are preserved",
+				sdkhelper.WithExample("0755"),
 			),
 			"manifests": sdkhelper.ArrayProp(
 				"List of per-platform images for the index operation",
