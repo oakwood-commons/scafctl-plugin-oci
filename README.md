@@ -160,6 +160,7 @@ Pull an image to a local Docker-style tarball.
 | `ref` | yes | Image reference |
 | `path` | yes | Local file path for the tarball |
 | `platform` | no | Target platform for multi-arch images |
+| `retry` | no | Retry transient registry errors (429/5xx). Accepts `true` (defaults), an attempt count, or `{ attempts, backoff, maxBackoff }` |
 
 **Output**: `success`, `ref`, `digest`, `path`
 
@@ -171,19 +172,28 @@ Push a local tarball to a registry.
 |-------|----------|-------------|
 | `ref` | yes | Destination image reference |
 | `path` | yes | Local tarball path |
+| `retry` | no | Retry transient registry errors (429/5xx). Accepts `true` (defaults), an attempt count, or `{ attempts, backoff, maxBackoff }` |
 
-**Output**: `success`, `ref`, `digest`, `size`
+**Output**: `success`, `ref`, `digest`, `size`, `mediaType`
 
 ### `copy`
 
-Copy an image between registries without pulling locally.
+Copy an image between registries without pulling locally. Replicates all
+referenced blobs (config + layers) before writing the manifest and recurses
+into multi-arch index children, matching `crane copy` semantics — so it works
+against registries that enforce blob-before-manifest ordering.
 
 | Input | Required | Description |
 |-------|----------|-------------|
 | `src` | yes | Source image reference |
 | `dst` | yes | Destination image reference |
+| `platform` | no | `os/arch[/variant]` to mirror a single architecture from a multi-arch index; `all` (default) copies the full index |
+| `skipIfExists` | no | Skip the write when the destination already holds the same digest (idempotent mirror). `force: false` is an equivalent alias |
+| `preserveReferrers` | no | Mirror cosign signatures/attestations attached to the source (default `true`) |
+| `retry` | no | Retry transient registry errors (429/5xx). Accepts `true` (defaults), an attempt count, or `{ attempts, backoff, maxBackoff }` |
 
-**Output**: `success`, `src`, `dst`, `digest`, `size`, `mediaType`
+**Output**: `success`, `skipped`, `src`, `dst`, `ref`, `digest`, `size`, `mediaType`, `referrersCopied`
+
 
 ### `append`
 

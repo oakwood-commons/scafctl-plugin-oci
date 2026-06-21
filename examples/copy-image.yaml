@@ -55,3 +55,14 @@ spec:
             rslvr: source
           dst:
             rslvr: target
+          # Copy the full multi-arch index (default). Set to a single platform
+          # such as "linux/amd64" to mirror just one architecture.
+          platform: all
+          # Skip the write when the destination already holds the same digest,
+          # making repeated mirrors fast and idempotent.
+          skipIfExists: true
+          # Mirror cosign signatures/attestations attached to the source (default true).
+          preserveReferrers: true
+          # Retry transient registry errors (429/5xx). Accepts an attempt count
+          # or a map: { attempts: 5, backoff: "1s", maxBackoff: "30s" }.
+          retry: 5
