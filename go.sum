@@ -47,8 +47,8 @@ github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27k
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
 github.com/mattn/go-isatty v0.0.17 h1:BTarxUcIeDqL27Mc+vyvdWYSL28zpIhv3RoTdsLMPng=
 github.com/mattn/go-isatty v0.0.17/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
-github.com/oakwood-commons/scafctl-plugin-sdk v0.10.0 h1:km2KASFp7Qh7JAJriLIaW37uD2MNZ7IA/MOSNqVvgeo=
-github.com/oakwood-commons/scafctl-plugin-sdk v0.10.0/go.mod h1:oC2LqrVwXEQBgR2rIp+PbSF0mLfkC1a2G5KJb6CzdgE=
+github.com/oakwood-commons/scafctl-plugin-sdk v0.16.0 h1:qCpABo7SSpHmgZ0KX8UXwDLT8L9CE9Qg2vrCXJROXv0=
+github.com/oakwood-commons/scafctl-plugin-sdk v0.16.0/go.mod h1:oC2LqrVwXEQBgR2rIp+PbSF0mLfkC1a2G5KJb6CzdgE=
 github.com/oklog/run v1.1.0 h1:GEenZ1cK0+q0+wsJew9qUg/DyD8k3JzYsZAi5gYi2mA=
 github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DVU=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
