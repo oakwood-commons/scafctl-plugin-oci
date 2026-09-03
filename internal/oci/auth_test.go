@@ -86,6 +86,13 @@ func TestScafctlKeychain_Resolve(t *testing.T) {
 	// Override config path via XDG_CONFIG_HOME.
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
+	// Isolate from any real host credentials (e.g. ~/.config/containers/auth.json
+	// or $XDG_RUNTIME_DIR/containers/auth.json) so "unknown registry" cases can't
+	// pick up creds that happen to exist on the machine running the test.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
+	t.Setenv("XDG_RUNTIME_DIR", "")
+
 	// Rename "scafctl" subdir structure — scafctlConfigPath expects <xdg>/scafctl/registries.json.
 	scafctlDir := filepath.Join(tmpDir, "scafctl")
 	require.NoError(t, os.MkdirAll(scafctlDir, 0o750))
