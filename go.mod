@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/google/go-containerregistry v0.22.0
+	github.com/google/go-containerregistry v0.22.1
 	github.com/google/jsonschema-go v0.4.3
 	github.com/oakwood-commons/scafctl-plugin-sdk v0.17.0
 	github.com/stretchr/testify v1.12.1
