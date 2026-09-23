@@ -2332,8 +2332,9 @@ func buildInputSchema() *jsonschema.Schema {
 				sdkhelper.WithExample("application/vnd.example.thing.v1"),
 			),
 			"config_media_type": sdkhelper.StringProp(
-				"Media type of the config descriptor (push-artifact operation). "+
-					"Defaults to the OCI empty config application/vnd.oci.empty.v1+json",
+				"Media type of the config descriptor (push-artifact operation). Required when "+
+					"config_path or config_inline is set; otherwise defaults to the OCI empty "+
+					"config application/vnd.oci.empty.v1+json",
 				sdkhelper.WithExample("application/vnd.example.config.v1+json"),
 			),
 			"config_path": sdkhelper.StringProp(

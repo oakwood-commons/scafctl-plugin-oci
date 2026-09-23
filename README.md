@@ -186,7 +186,7 @@ Push an arbitrary **OCI 1.1 artifact** daemonlessly — no container runtime, no
 | `ref` | yes | Destination reference, e.g. `ghcr.io/org/repo:tag` |
 | `artifact_type` | yes | Top-level OCI `artifactType`, e.g. `application/vnd.example.thing.v1` |
 | `artifact_layers` | yes (≥1) | Array of `{ path, media_type, annotations? }` — raw file blobs (no tar/gzip) with per-layer media types |
-| `config_media_type` | no | Config descriptor media type. Defaults to the OCI empty config `application/vnd.oci.empty.v1+json` |
+| `config_media_type` | no | Config descriptor media type. **Required** when `config_path`/`config_inline` is set; only defaults to the OCI empty config `application/vnd.oci.empty.v1+json` when no config content is supplied |
 | `config_path` | no | File whose raw bytes become the config blob (mutually exclusive with `config_inline`) |
 | `config_inline` | no | Inline string content for the config blob (mutually exclusive with `config_path`) |
 | `annotations` | no | Manifest-level OCI annotations |

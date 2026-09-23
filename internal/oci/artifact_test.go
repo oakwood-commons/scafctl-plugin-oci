@@ -237,11 +237,31 @@ func TestPushArtifact_Errors(t *testing.T) {
 			errContains: "mutually exclusive",
 		},
 		{
-			name: "config_path unreadable",
+			name: "config_inline without config_media_type",
 			input: map[string]any{
 				"operation": OpPushArtifact, "ref": "localhost/a:b",
 				"artifact_type": "application/vnd.example.thing.v1",
-				"config_path":   filepath.Join(dir, "missing.json"),
+				"config_inline": `{"kind":"thing"}`,
+			},
+			errContains: `"config_media_type" is required`,
+		},
+		{
+			name: "config_path without config_media_type",
+			input: map[string]any{
+				"operation": OpPushArtifact, "ref": "localhost/a:b",
+				"artifact_type":   "application/vnd.example.thing.v1",
+				"config_path":     configPath,
+				"artifact_layers": []any{map[string]any{"path": layerPath, "media_type": "application/octet-stream"}},
+			},
+			errContains: `"config_media_type" is required`,
+		},
+		{
+			name: "config_path unreadable",
+			input: map[string]any{
+				"operation": OpPushArtifact, "ref": "localhost/a:b",
+				"artifact_type":     "application/vnd.example.thing.v1",
+				"config_media_type": "application/vnd.example.config.v1+json",
+				"config_path":       filepath.Join(dir, "missing.json"),
 			},
 			errContains: "reading config_path",
 		},

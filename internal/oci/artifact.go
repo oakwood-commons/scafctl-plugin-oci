@@ -174,17 +174,23 @@ func (p *Plugin) executePushArtifact(ctx context.Context, input map[string]any) 
 // resolveArtifactConfig determines the config blob's media type and bytes.
 // config_path and config_inline are mutually exclusive; when neither is set,
 // the OCI 1.1 empty config sentinel ({} with the empty config media type) is
-// used.
+// used. When content IS supplied, config_media_type is required — the
+// empty-config media type is reserved for the empty blob and must not label
+// arbitrary content.
 func resolveArtifactConfig(input map[string]any) (types.MediaType, []byte, error) {
-	mediaType := ociEmptyConfigMediaType
-	if mt, _ := input["config_media_type"].(string); mt != "" {
-		mediaType = types.MediaType(mt)
-	}
-
 	configPath, _ := input["config_path"].(string)
 	configInline, _ := input["config_inline"].(string)
 	if configPath != "" && configInline != "" {
 		return "", nil, fmt.Errorf("fields \"config_path\" and \"config_inline\" are mutually exclusive")
+	}
+
+	mediaType, _ := input["config_media_type"].(string)
+	if mediaType == "" {
+		if configPath != "" || configInline != "" {
+			return "", nil, fmt.Errorf(
+				"field \"config_media_type\" is required when config_path or config_inline is set")
+		}
+		mediaType = string(ociEmptyConfigMediaType)
 	}
 
 	switch {
@@ -193,11 +199,11 @@ func resolveArtifactConfig(input map[string]any) (types.MediaType, []byte, error
 		if err != nil {
 			return "", nil, fmt.Errorf("reading config_path %q: %w", configPath, err)
 		}
-		return mediaType, b, nil
+		return types.MediaType(mediaType), b, nil
 	case configInline != "":
-		return mediaType, []byte(configInline), nil
+		return types.MediaType(mediaType), []byte(configInline), nil
 	default:
-		return mediaType, []byte("{}"), nil
+		return types.MediaType(mediaType), []byte("{}"), nil
 	}
 }
 
