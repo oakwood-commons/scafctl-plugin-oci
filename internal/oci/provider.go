@@ -41,24 +41,25 @@ var version = "0.1.0"
 
 // Operations supported by the OCI provider.
 const (
-	OpDigest   = "digest"
-	OpManifest = "manifest"
-	OpLs       = "ls"
-	OpCatalog  = "catalog"
-	OpPull     = "pull"
-	OpPush     = "push"
-	OpCopy     = "copy"
-	OpAppend   = "append"
-	OpMutate   = "mutate"
-	OpConfig   = "config"
-	OpTag      = "tag"
-	OpIndex    = "index"
-	OpValidate = "validate"
-	OpBlob     = "blob"
-	OpExport   = "export"
-	OpFlatten  = "flatten"
-	OpRebase   = "rebase"
-	OpDelete   = "delete"
+	OpDigest       = "digest"
+	OpManifest     = "manifest"
+	OpLs           = "ls"
+	OpCatalog      = "catalog"
+	OpPull         = "pull"
+	OpPush         = "push"
+	OpPushArtifact = "push-artifact"
+	OpCopy         = "copy"
+	OpAppend       = "append"
+	OpMutate       = "mutate"
+	OpConfig       = "config"
+	OpTag          = "tag"
+	OpIndex        = "index"
+	OpValidate     = "validate"
+	OpBlob         = "blob"
+	OpExport       = "export"
+	OpFlatten      = "flatten"
+	OpRebase       = "rebase"
+	OpDelete       = "delete"
 )
 
 // Plugin implements the scafctl ProviderPlugin interface.
@@ -107,7 +108,7 @@ func (p *Plugin) GetProviderDescriptor(_ context.Context, providerName string) (
 			sdkprovider.CapabilityAction,
 		},
 		WriteOperations: []string{
-			OpPull, OpPush, OpCopy, OpAppend, OpMutate,
+			OpPull, OpPush, OpPushArtifact, OpCopy, OpAppend, OpMutate,
 			OpTag, OpIndex, OpExport, OpFlatten, OpRebase, OpDelete,
 		},
 		Schema:        buildInputSchema(),
@@ -143,6 +144,8 @@ func (p *Plugin) ExecuteProvider(ctx context.Context, providerName string, input
 		return p.executePull(ctx, input)
 	case OpPush:
 		return p.executePush(ctx, input)
+	case OpPushArtifact:
+		return p.executePushArtifact(ctx, input)
 	case OpCopy:
 		return p.executeCopy(ctx, input)
 	case OpConfig:
@@ -205,6 +208,10 @@ func (p *Plugin) DescribeWhatIf(_ context.Context, providerName string, input ma
 		return fmt.Sprintf("Would pull %s to %s", ref, path), nil
 	case OpPush:
 		return fmt.Sprintf("Would push %s from %s", ref, path), nil
+	case OpPushArtifact:
+		artifactType, _ := input["artifact_type"].(string)
+		return fmt.Sprintf("Would push OCI 1.1 artifact to %s (artifactType %s, %d raw layer(s))",
+			ref, artifactType, countArtifactLayers(input)), nil
 	case OpCopy:
 		plat, _, perr := parseCopyPlatform(input)
 		if perr != nil {
@@ -2258,7 +2265,7 @@ func buildInputSchema() *jsonschema.Schema {
 				"The operation to perform",
 				sdkhelper.WithEnum(
 					OpDigest, OpManifest, OpConfig, OpLs, OpCatalog,
-					OpPull, OpPush, OpCopy, OpAppend, OpMutate, OpTag, OpIndex,
+					OpPull, OpPush, OpPushArtifact, OpCopy, OpAppend, OpMutate, OpTag, OpIndex,
 					OpValidate, OpBlob, OpExport, OpFlatten, OpRebase, OpDelete,
 				),
 			),
@@ -2319,6 +2326,38 @@ func buildInputSchema() *jsonschema.Schema {
 					"Required when cross-compiling on Windows because Go's os.FileInfo "+
 					"does not set execute bits. When absent, source file permissions are preserved",
 				sdkhelper.WithExample("0755"),
+			),
+			"artifact_type": sdkhelper.StringProp(
+				"Top-level OCI 1.1 artifactType (push-artifact operation, required)",
+				sdkhelper.WithExample("application/vnd.example.thing.v1"),
+			),
+			"config_media_type": sdkhelper.StringProp(
+				"Media type of the config descriptor (push-artifact operation). "+
+					"Defaults to the OCI empty config application/vnd.oci.empty.v1+json",
+				sdkhelper.WithExample("application/vnd.example.config.v1+json"),
+			),
+			"config_path": sdkhelper.StringProp(
+				"File whose raw bytes become the config blob (push-artifact operation; "+
+					"mutually exclusive with config_inline)",
+				sdkhelper.WithExample("./artifact-config.json"),
+			),
+			"config_inline": sdkhelper.StringProp(
+				"Inline content for the config blob (push-artifact operation; mutually exclusive "+
+					"with config_path). Defaults to the OCI empty config {}",
+				sdkhelper.WithExample("{\"kind\":\"thing\"}"),
+			),
+			"artifact_layers": sdkhelper.ArrayProp(
+				"Raw-file layers for push-artifact. Each blob is the file bytes verbatim "+
+					"(no tar, no gzip), so the descriptor digest equals the file's own sha256",
+				sdkhelper.WithItems(sdkhelper.ObjectProp(
+					"An artifact layer",
+					[]string{"path", "media_type"},
+					map[string]*jsonschema.Schema{
+						"path":        sdkhelper.StringProp("File whose raw bytes become the layer blob"),
+						"media_type":  sdkhelper.StringProp("Layer descriptor media type", sdkhelper.WithExample("application/vnd.example.payload.v1+yaml")),
+						"annotations": sdkhelper.ObjectProp("Per-layer descriptor annotations (e.g. org.opencontainers.image.title)", nil, nil),
+					},
+				)),
 			),
 			"manifests": sdkhelper.ArrayProp(
 				"List of per-platform images for the index operation",
@@ -2402,6 +2441,8 @@ func buildOutputSchemas() map[sdkprovider.Capability]*jsonschema.Schema {
 			"digest":          sdkhelper.StringProp("Image digest (sha256:...)"),
 			"size":            sdkhelper.IntProp("Image size in bytes"),
 			"mediaType":       sdkhelper.StringProp("Manifest media type"),
+			"artifactType":    sdkhelper.StringProp("Top-level OCI 1.1 artifactType (push-artifact operation)"),
+			"layerDigests":    sdkhelper.ArrayProp("Raw layer blob digests in manifest order (push-artifact operation)", sdkhelper.WithItems(sdkhelper.StringProp("sha256:..."))),
 			"manifest":        sdkhelper.StringProp("Raw manifest JSON (manifest operation)"),
 			"tags":            sdkhelper.ArrayProp("List of tags (ls operation)", sdkhelper.WithItems(sdkhelper.StringProp("tag"))),
 			"repository":      sdkhelper.StringProp("Repository name"),

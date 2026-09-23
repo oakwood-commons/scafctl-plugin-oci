@@ -192,6 +192,7 @@ func TestIntegration_WhatIfParity(t *testing.T) {
 		{"operation": "catalog", "registry": "ghcr.io"},
 		{"operation": "pull", "ref": "ghcr.io/test/app:v1", "path": "/tmp/x.tar"},
 		{"operation": "push", "ref": "ghcr.io/test/app:v1", "path": "/tmp/x.tar"},
+		{"operation": "push-artifact", "ref": "ghcr.io/test/app:v1"},
 		{"operation": "copy", "src": "a.io/x:1", "dst": "b.io/x:1"},
 		{"operation": "append", "ref": "ghcr.io/test/app:v1"},
 		{"operation": "mutate", "ref": "ghcr.io/test/app:v1"},

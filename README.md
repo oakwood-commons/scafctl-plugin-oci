@@ -25,6 +25,7 @@ The **provider name** is what users reference in solutions (`provider: oci`).
 | `catalog` | List repositories in a registry |
 | `pull` | Pull image to local tarball |
 | `push` | Push local tarball to registry |
+| `push-artifact` | Push arbitrary OCI 1.1 artifacts (custom `artifactType`, config blob, raw-file layers) |
 | `copy` | Copy image between registries |
 | `append` | Append layer(s) to a base image (supports scratch) |
 | `mutate` | Modify image config with optional layer append, annotations, and destination override |
@@ -175,6 +176,26 @@ Push a local tarball to a registry.
 | `retry` | no | Retry transient registry errors (429/5xx). Accepts `true` (defaults), an attempt count, or `{ attempts, backoff, maxBackoff }` |
 
 **Output**: `success`, `ref`, `digest`, `size`, `mediaType`
+
+### `push-artifact`
+
+Push an arbitrary **OCI 1.1 artifact** daemonlessly — no container runtime, no `oras` binary. The artifact is assembled in memory: a top-level `artifactType`, a config blob with a media type you choose, and raw-file layers each carrying their own media type. Unlike `append`/`mutate`, layers are **not** tarred or gzipped — each blob is the file bytes verbatim, so each layer descriptor digest equals the file's own `sha256`.
+
+| Input | Required | Description |
+|-------|----------|-------------|
+| `ref` | yes | Destination reference, e.g. `ghcr.io/org/repo:tag` |
+| `artifact_type` | yes | Top-level OCI `artifactType`, e.g. `application/vnd.example.thing.v1` |
+| `artifact_layers` | yes (≥1) | Array of `{ path, media_type, annotations? }` — raw file blobs (no tar/gzip) with per-layer media types |
+| `config_media_type` | no | Config descriptor media type. Defaults to the OCI empty config `application/vnd.oci.empty.v1+json` |
+| `config_path` | no | File whose raw bytes become the config blob (mutually exclusive with `config_inline`) |
+| `config_inline` | no | Inline string content for the config blob (mutually exclusive with `config_path`) |
+| `annotations` | no | Manifest-level OCI annotations |
+| `retry` | no | Retry transient registry errors (429/5xx). Accepts `true` (defaults), an attempt count, or `{ attempts, backoff, maxBackoff }` |
+
+When no config content is supplied, the OCI 1.1 empty config sentinel is pushed: a `{}` blob with `application/vnd.oci.empty.v1+json`.
+
+**Output**: `success`, `ref`, `digest` (manifest digest), `size` (config + layer bytes), `mediaType`, `artifactType`, `layerDigests`
+
 
 ### `copy`
 
@@ -382,6 +403,12 @@ scafctl run provider oci operation=tag ref=ghcr.io/myorg/app:v1 tag=latest
 
 # Build from scratch
 scafctl run provider oci operation=append ref=scratch dst=ghcr.io/myorg/data:v1 layers='["./data"]'
+
+# Push an arbitrary OCI 1.1 artifact (raw-file layers, no tar/gzip)
+scafctl run provider oci operation=push-artifact ref=ghcr.io/myorg/myart:v1 \
+  artifact_type=application/vnd.example.thing.v1 \
+  artifact_layers='[{"path":"./values.yaml","media_type":"application/vnd.example.payload.v1+yaml"}]' \
+  config_inline='{"kind":"thing"}'
 
 # Mutate with annotations
 scafctl run provider oci operation=mutate ref=ghcr.io/myorg/app:v1 entrypoint=/app annotations='{"org.opencontainers.image.source":"https://github.com/myorg/app"}'
