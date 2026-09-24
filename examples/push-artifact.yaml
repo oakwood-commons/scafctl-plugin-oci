@@ -1,0 +1,64 @@
+# Example: Publish an arbitrary OCI 1.1 artifact.
+#
+# Useful for pushing content in a specific artifact format (config blobs,
+# policy bundles, SLSA attestations, oras-style payloads) without a Docker
+# daemon and without shelling out to `oras`. Raw-file layers are pushed
+# verbatim — no tar, no gzip — so each layer digest equals the file's sha256.
+#
+# Setup:
+#   task release:local VERSION=0.1.0
+#   scafctl plugins install -f examples/push-artifact.yaml
+#
+# Run:
+#   scafctl run solution -f examples/push-artifact.yaml
+apiVersion: scafctl.io/v1
+kind: Solution
+metadata:
+  name: oci-push-artifact-example
+  version: 1.0.0
+  description: Publish a custom OCI 1.1 artifact with raw-file layers.
+
+bundle:
+  plugins:
+    - name: oci
+      kind: provider
+      version: "0.1.0"
+
+spec:
+  resolvers:
+    target:
+      type: string
+      description: Destination artifact reference
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: ghcr.io/myorg/my-artifact:latest
+
+    payloadFile:
+      type: string
+      description: Local file whose raw bytes become the artifact layer
+      resolve:
+        with:
+          - provider: static
+            inputs:
+              value: ./payload.yaml
+
+  workflow:
+    actions:
+      push-artifact:
+        description: Assemble and push the OCI 1.1 artifact
+        provider: oci
+        inputs:
+          operation: push-artifact
+          ref: "{{ .resolvers.target }}"
+          artifact_type: "application/vnd.example.thing.v1"
+          config_media_type: "application/vnd.example.config.v1+json"
+          config_inline: '{"kind":"thing"}'
+          annotations:
+            org.opencontainers.image.source: "https://github.com/myorg/my-repo"
+          artifact_layers:
+            - path: "{{ .resolvers.payloadFile }}"
+              media_type: "application/vnd.example.payload.v1+yaml"
+              annotations:
+                org.opencontainers.image.title: "payload.yaml"
