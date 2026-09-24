@@ -142,9 +142,6 @@ jobs:
 
       - name: Refresh catalog index
         run: |
-          mkdir -p ~/.docker
-          AUTH=$(printf '%s' "${{ github.actor }}:${{ secrets.CATALOG_PUSH_TOKEN }}" | base64 -w 0)
-          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > ~/.docker/config.json
           scafctl catalog index push \
             --catalog "oci://ghcr.io/${{ github.repository_owner }}"
 
