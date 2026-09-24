@@ -142,9 +142,13 @@ jobs:
 
       - name: Refresh catalog index
         run: |
-          mkdir -p ~/.docker
-          AUTH=$(printf '%s' "${{ github.actor }}:${{ secrets.CATALOG_PUSH_TOKEN }}" | base64 -w 0)
-          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > ~/.docker/config.json
+          # The index push reuses the credentials written by the earlier
+          # "Login to GitHub Container Registry" step; fail fast with a clear
+          # error if that auth entry is missing.
+          if ! grep -q 'ghcr.io' "${HOME}/.docker/config.json" 2>/dev/null; then
+            echo "::error::Missing ghcr.io auth; the login step must run first"
+            exit 1
+          fi
           scafctl catalog index push \
             --catalog "oci://ghcr.io/${{ github.repository_owner }}"
 
