@@ -49,7 +49,7 @@ Repo-specific (`scafctl-plugin-oci` -- provider plugin):
 - **Provider contract coherence**: `GetProviders`, `GetProviderDescriptor`,
   `ExecuteProvider`, `DescribeWhatIf`, and `ExtractDependencies` must agree on
   provider name, schema, and capabilities. Every declared capability MUST have
-   a matching entry in `OutputSchemas` (missing output schemas fail host
+  a matching entry in `OutputSchemas` (missing output schemas fail host
   registration).
 - **Side-effect-free & redacted `DescribeWhatIf`**: `DescribeWhatIf` must never
   perform network/filesystem/process mutations and must never echo raw secrets
@@ -60,10 +60,13 @@ Repo-specific (`scafctl-plugin-oci` -- provider plugin):
   response/file handle cleanup.
 - **Coverage & race safety**: require `-race`-clean tests and 70%+ patch
   coverage covering both happy and failure paths.
-- **Publish hygiene**: this repo is public -- flag any employer- or
-  organization-specific reference (internal tool names, hostnames/domains,
-  codenames, employee/user IDs, credentials) in the diff, including in docs,
-  examples, and test fixtures.
+- **Publish hygiene**: this repo is public -- flag any **non-public** employer-
+  or organization-specific reference (internal tool names, private
+  hostnames/domains, internal codenames, employee/user IDs, or real
+  credentials) in the diff, including in docs, examples, and test fixtures.
+  Legitimate public project/dependency identifiers (such as
+  `oakwood-commons/*` module paths and release URLs) and clearly fictional
+  placeholders (`example.com`, `myorg`) are expected and must not be flagged.
 - **PR title/body accuracy**: the repo squash-merges pull requests using the PR
   title and body -- the PR title must be a valid conventional-commit subject
   and the body must describe the change as it stands at `HEAD`, not an earlier
@@ -111,9 +114,9 @@ rather than re-reviewing the entire pull request from scratch:
    issue is resolved, and check the immediate implications of that fix (e.g.
    whether the fix introduced a regression or missed a sibling occurrence of
    the same defect in adjacent paths).
-2. **Scope file inspection to changed files + newly affected callers**: review
-   only the files modified since `<last_reviewed_commit>`, plus callers or
-   consumers of any interface whose signature or behavior changed in that
-   delta. **Do not re-read or re-audit untouched files** that already passed an
+2. **Scope review to changed files + relevant context**: audit only the files
+   modified since `<last_reviewed_commit>`, reading callers, consumers, tests,
+   or contract definitions in unchanged files only as needed to verify the
+   delta. **Do not re-audit unrelated, untouched files** that already passed an
    earlier review round.
 3. **Check PR body sync**: confirm the PR title and body still match `HEAD`.
