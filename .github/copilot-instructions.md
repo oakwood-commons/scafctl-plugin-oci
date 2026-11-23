@@ -107,3 +107,7 @@ The publishing token needs `repo`, `read:packages`, and `write:packages` scopes.
 - **No hardcoded paths**: Use SDK interfaces for host interactions
 - **Test coverage**: Every new file should have tests. Target 70%+ patch coverage
 - **Git safety**: Never run git commit or push unless explicitly asked
+
+<!-- copilot-review:start -->
+For pull request code review, follow the review contract in [`REVIEW.md`](../REVIEW.md) at the repo root. It is the single source of truth; do not duplicate it here.
+<!-- copilot-review:end -->
